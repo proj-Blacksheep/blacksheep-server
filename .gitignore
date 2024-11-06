@@ -191,3 +191,6 @@ Temporary Items
 
 # Pre-commit
 .pre-commit-config.yaml
+
+# Ruff
+.ruff_cache/
