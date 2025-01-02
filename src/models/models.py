@@ -13,3 +13,6 @@ class Models(Base, TimeStampMixin):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), unique=True, index=True, nullable=False)
     description = Column(String(255), nullable=False)
+    model_api_key = Column(String(255), unique=True, index=True, nullable=False)
+    model_endpoint = Column(String(255), nullable=False)
+    model_name = Column(String(255), nullable=False)

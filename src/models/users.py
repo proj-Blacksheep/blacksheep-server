@@ -29,5 +29,14 @@ class UserResponse(BaseModel):
     api_key: str
     role: str
 
-    class Config:
-        from_attributes = True
+
+class UserCreate(BaseModel):
+    """Request model for user creation.
+
+    Attributes:
+        username: The username for the new user.
+        password: The password for the user account.
+    """
+
+    username: str
+    password: str

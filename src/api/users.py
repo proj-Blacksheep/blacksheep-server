@@ -1,23 +1,9 @@
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
-from src.models.users import UserResponse
-from src.services.users import create_user_db, get_all_users
 from typing import List
+from fastapi import APIRouter, HTTPException
+from src.models.users import UserResponse, UserCreate
+from src.services.users import create_user_db, get_all_users
 
 router = APIRouter(prefix="/users", tags=["users"])
-
-
-class UserCreate(BaseModel):
-    """Request model for user creation.
-
-    Attributes:
-        username: The username for the new user.
-        email: The email address of the user.
-        password: The password for the user account.
-    """
-
-    username: str
-    password: str
 
 
 @router.post("/create", response_model=UserResponse)
@@ -40,7 +26,7 @@ async def create_user_endpoint(user_data: UserCreate):
         )
         return user
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @router.get("/", response_model=List[UserResponse])
@@ -57,4 +43,6 @@ async def get_users():
         users = await get_all_users()
         return users
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
