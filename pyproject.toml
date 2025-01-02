@@ -1,14 +1,25 @@
 [tool.poetry]
-name = "blacksheep-server"
+name = "fastapi-template"
 version = "0.1.0"
-description = ""
-authors = ["ppippi <wjdqlsdlsp@naver.com>"]
-readme = "README.md"
+description = "FastAPI 프로젝트 템플릿"
+authors = ["Your Name <your.email@example.com>"]
 
 [tool.poetry.dependencies]
-python = "^3.12"
+python = "^3.9"
+fastapi = "^0.104.0"
+uvicorn = "^0.24.0"
+sqlalchemy = "^2.0.23"
+pydantic = "^2.4.2"
+pydantic-settings = "^2.0.3"
+alembic = "^1.12.1"
+psycopg2-binary = "^2.9.9"
 
+[tool.poetry.dev-dependencies]
+pytest = "^7.4.3"
+black = "^23.10.1"
+isort = "^5.12.0"
+flake8 = "^6.1.0"
 
 [build-system]
-requires = ["poetry-core"]
+requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
