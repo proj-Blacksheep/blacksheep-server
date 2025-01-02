@@ -1,7 +1,5 @@
-from sqlalchemy import Column, Integer, DateTime
+from sqlalchemy import Column, DateTime
 from sqlalchemy.sql import func
-
-from src.db.database import Base
 
 
 class TimeStampMixin:
