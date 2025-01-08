@@ -21,6 +21,14 @@ class Settings(BaseSettings):
 
     DATABASE_URL: str = "sqlite:///./sql_app.db"
 
+    # JWT 토큰 생성 시 사용할 비밀 키
+    SECRET_KEY: str = "your-secret-key"
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+
+    DEFAULT_ADMIN_USERNAME: str = "admin"
+    DEFAULT_ADMIN_PASSWORD: str = "admin"
+
 
 @lru_cache
 def get_settings() -> Settings:
