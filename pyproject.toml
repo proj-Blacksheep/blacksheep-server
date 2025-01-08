@@ -1,13 +1,27 @@
 [tool.poetry]
 name = "blacksheep-server"
 version = "0.1.0"
-description = ""
+description = "Blacksheep Server"
 authors = ["ppippi <wjdqlsdlsp@naver.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.12"
+fastapi = "^0.110.0"
+uvicorn = "^0.27.1"
+sqlalchemy = "^2.0.27"
+pydantic = "^2.4.2"
+pydantic-settings = "^2.0.3"
+alembic = "^1.12.1"
+psycopg2-binary = "^2.9.9"
+aiosqlite = "^0.19.0"
+greenlet = "^3.0.3"
 
+[tool.poetry.dev-dependencies]
+pytest = "^7.4.3"
+black = "^23.10.1"
+isort = "^5.12.0"
+flake8 = "^6.1.0"
 
 [build-system]
 requires = ["poetry-core"]
