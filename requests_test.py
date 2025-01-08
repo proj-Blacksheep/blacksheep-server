@@ -25,9 +25,31 @@ def call_api():
             },
             {
                 "role": "user",
-                "content": "삶이란 무엇인지 삶: xxx 형식으로 간단한하게 표현해줘",
+                "content": "삶이란 무엇인지 간단한하게 표현해줘",
             },
         ],
+        "response_format": {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "whats_the_life",
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "life": {
+                            "type": "string",
+                            "description": "life",
+                        },
+                        "reason": {
+                            "type": "string",
+                            "description": "reason",
+                        },
+                    },
+                    "required": ["life", "reason"],
+                    "additionalProperties": False,
+                },
+                "strict": True,
+            },
+        },
     }
 
     try:

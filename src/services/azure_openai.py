@@ -1,6 +1,7 @@
 from openai import AsyncAzureOpenAI
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.user_model_usage import UserModelUsage
+from typing import Optional, Any
 
 
 async def call_azure_openai(
@@ -11,6 +12,7 @@ async def call_azure_openai(
     user_id: int,
     model_id: int,
     db: AsyncSession,
+    response_format: Optional[Any] = None,
 ) -> str:
     """Creates an async Azure OpenAI client, makes API calls and saves token usage.
 
@@ -32,10 +34,17 @@ async def call_azure_openai(
         api_version="2024-10-01-preview",
     )
 
-    response = await azure_openai_client.chat.completions.create(
-        messages=messages,
-        model=model_name,
-    )
+    if response_format is not None:
+        response = await azure_openai_client.chat.completions.create(
+            messages=messages,
+            model=model_name,
+            response_format=response_format,
+        )
+    else:
+        response = await azure_openai_client.chat.completions.create(
+            messages=messages,
+            model=model_name,
+        )
 
     response_content = response.choices[0].message.content
     print(response_content)
