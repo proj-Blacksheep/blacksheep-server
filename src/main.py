@@ -3,12 +3,38 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from src.db.database import init_db
 from src.api.users import router as users_router
+from src.api.login import router as login_router
+from src.core.config import settings
+from src.services.users import create_user_db
+from sqlalchemy.exc import IntegrityError
+from src.api.models import router as models_router
+from src.api.call_api import router as call_api_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """애플리케이션 시작/종료 시 실행되는 이벤트"""
+    """
+    Application startup and shutdown events.
+
+    This context manager handles database initialization and creates a default admin user
+    if one doesn't exist.
+
+    Args:
+        app: The FastAPI application instance.
+    """
     await init_db()
+
+    # Create default admin user if not exists
+    try:
+        await create_user_db(
+            username=settings.DEFAULT_ADMIN_USERNAME,
+            password=settings.DEFAULT_ADMIN_PASSWORD,
+            role="admin",
+        )
+    except IntegrityError:
+        # User already exists, ignore the error
+        pass
+
     yield
 
 
@@ -41,3 +67,6 @@ async def health_check():
 
 # 라우터 등록
 app.include_router(users_router)
+app.include_router(login_router)
+app.include_router(models_router)
+app.include_router(call_api_router)

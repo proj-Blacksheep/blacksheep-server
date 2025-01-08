@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String
 from src.db.database import Base
 from src.models.base import TimeStampMixin
+from pydantic import BaseModel
 
 
 class Models(Base, TimeStampMixin):
@@ -16,3 +17,19 @@ class Models(Base, TimeStampMixin):
     model_api_key = Column(String(255), unique=True, index=True, nullable=False)
     model_endpoint = Column(String(255), nullable=False)
     model_name = Column(String(255), nullable=False)
+
+
+class ModelResponse(BaseModel):
+    id: int
+    name: str
+    description: str
+    model_endpoint: str
+    model_name: str
+
+
+class ModelCreateRequest(BaseModel):
+    name: str
+    description: str
+    model_endpoint: str
+    model_api_key: str
+    model_name: str

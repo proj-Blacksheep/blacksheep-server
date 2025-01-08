@@ -5,7 +5,7 @@ import uuid
 from sqlalchemy import select
 
 
-async def create_user_db(username: str, password: str) -> Users:
+async def create_user_db(username: str, password: str, role: str = "basic") -> Users:
     """Create a new user in the database.
 
     Args:
@@ -22,7 +22,7 @@ async def create_user_db(username: str, password: str) -> Users:
             username=username,
             password=password,
             api_key=api_key,
-            role="basic",  # 기본 역할을 'basic'으로 설정
+            role=role,
         )
 
         session.add(new_user)
@@ -42,3 +42,35 @@ async def get_all_users() -> List[Users]:
         result = await session.execute(select(Users))
         users = result.scalars().all()
         return list(users)
+
+
+async def get_user_by_api_key(api_key: str) -> Users | None:
+    """Get a user by their API key.
+
+    Args:
+        api_key: The API key to search for.
+
+    Returns:
+        Users | None: The user object if found, None otherwise.
+    """
+    async with async_session_maker() as session:
+        result = await session.execute(select(Users).where(Users.api_key == api_key))
+        return result.scalar_one_or_none()
+
+
+async def get_api_key_by_credentials(username: str, password: str) -> str | None:
+    """Get user's API key using their username and password.
+
+    Args:
+        username: The username of the user.
+        password: The password of the user.
+
+    Returns:
+        str | None: The API key if credentials are valid, None otherwise.
+    """
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(Users).where(Users.username == username, Users.password == password)
+        )
+        user = result.scalar_one_or_none()
+        return str(user.api_key) if user else None

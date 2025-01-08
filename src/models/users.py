@@ -21,16 +21,14 @@ class UserResponse(BaseModel):
 
     Attributes:
         username: The username of the user.
-        api_key: The API key for the user.
         role: The role of the user.
     """
 
     username: str
-    api_key: str
     role: str
 
 
-class UserCreate(BaseModel):
+class UserSchema(BaseModel):
     """Request model for user creation.
 
     Attributes:
@@ -40,3 +38,4 @@ class UserCreate(BaseModel):
 
     username: str
     password: str
+    role: str = "basic"
