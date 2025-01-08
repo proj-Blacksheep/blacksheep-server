@@ -3,7 +3,6 @@ name = "blacksheep-server"
 version = "0.1.0"
 description = "Blacksheep Server"
 authors = ["ppippi <wjdqlsdlsp@naver.com>"]
-readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.12"
