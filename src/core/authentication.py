@@ -6,9 +6,9 @@ This module provides functions for user authentication and token management.
 from datetime import UTC, datetime, timedelta
 from typing import Any, Optional, cast
 
+import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
 from pydantic import BaseModel
 from sqlalchemy import select
 
@@ -78,7 +78,7 @@ def create_access_token(
     encoded_jwt = jwt.encode(
         to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM
     )
-    return encoded_jwt
+    return str(encoded_jwt)
 
 
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> Users:
@@ -106,7 +106,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> Users:
         if username is None:
             raise credentials_exception
         token_data = TokenData(username=username, exp=payload.get("exp"))
-    except JWTError:
+    except jwt.InvalidTokenError:
         raise credentials_exception
 
     async with get_session() as session:
