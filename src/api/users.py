@@ -5,16 +5,11 @@ user creation, deletion, and updates.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
 
-from src.core.authentication import (
-    authenticate_user,
-    create_access_token,
-    get_current_user,
-)
+from src.core.authentication import get_current_user
 from src.db.database import get_session
-from src.models.models import Token, UserCreate, UserResponse
+from src.models.models import UserCreate, UserResponse
 from src.models.users import Users
 from src.services.user_model_usage import get_usage_by_user_name
 from src.services.users import (
@@ -30,32 +25,6 @@ router = APIRouter(
     tags=["users"],
     responses={404: {"description": "Not found"}},
 )
-
-
-@router.post("/token", response_model=Token)
-async def login_for_access_token(
-    form_data: OAuth2PasswordRequestForm = Depends(),
-) -> Token:
-    """Authenticate user and provide access token.
-
-    Args:
-        form_data: OAuth2 password request form containing username and password.
-
-    Returns:
-        Token: Access token for authenticated user.
-
-    Raises:
-        HTTPException: If authentication fails.
-    """
-    user = await authenticate_user(form_data.username, form_data.password)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    access_token = create_access_token(data={"sub": user.username})
-    return Token(access_token=access_token, token_type="bearer")
 
 
 @router.post("/create", response_model=UserResponse)
