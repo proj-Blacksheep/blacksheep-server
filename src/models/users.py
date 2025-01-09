@@ -1,11 +1,22 @@
-from sqlalchemy import Column, Integer, String
+"""SQLAlchemy models for user management."""
+
 from pydantic import BaseModel
+from sqlalchemy import Column, Integer, String
+
 from src.db.database import Base
 from src.models.base import TimeStampMixin
 
 
-class Users(Base, TimeStampMixin):
-    """SQLAlchemy model for storing user related details."""
+class Users(Base):
+    """SQLAlchemy model for storing user related details.
+
+    Attributes:
+        id: The unique identifier for the user.
+        username: The unique username for the user.
+        password: The hashed password for the user.
+        api_key: The unique API key for the user.
+        role: The role of the user (basic or admin).
+    """
 
     __tablename__ = "users"
 
@@ -14,6 +25,9 @@ class Users(Base, TimeStampMixin):
     password = Column(String(255), nullable=False)
     api_key = Column(String(255), unique=True, index=True, nullable=False)
     role = Column(String(255), nullable=False)
+
+    created_at = TimeStampMixin.created_at
+    updated_at = TimeStampMixin.updated_at
 
 
 class UserResponse(BaseModel):
@@ -34,6 +48,7 @@ class UserSchema(BaseModel):
     Attributes:
         username: The username for the new user.
         password: The password for the user account.
+        role: The role of the user (defaults to "basic").
     """
 
     username: str
