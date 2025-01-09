@@ -17,7 +17,7 @@ pydantic = "^2.5.3"
 pydantic-settings = "^2.1.0"
 
 [tool.poetry.group.dev.dependencies]
-black = "^24.1.1"
+black = "^24.3.0"
 isort = "^5.13.2"
 flake8 = "^7.0.0"
 flake8-docstrings = "^1.7.0"
