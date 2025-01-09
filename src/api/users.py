@@ -30,6 +30,7 @@ class UpdatePasswordRequest(BaseModel):
         current_password: The current password for verification.
         new_password: The new password to set.
     """
+
     current_password: str
     new_password: str
 
@@ -164,7 +165,7 @@ async def get_usage(
     """
     try:
         target_username = username if username else current_user.username
-        
+
         if current_user.role != "admin" and target_username != current_user.username:
             raise HTTPException(
                 status_code=403,

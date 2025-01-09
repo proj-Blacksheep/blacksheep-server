@@ -44,6 +44,7 @@ class UserResponse(BaseModel):
         email: The user's email address.
         role: The user's role in the system.
     """
+
     id: int
     username: str
     role: str

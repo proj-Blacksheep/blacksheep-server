@@ -8,7 +8,9 @@ router = APIRouter(prefix="/models", tags=["models"])
 
 
 @router.post("/create", response_model=ModelResponse)
-async def create_model(model_data: ModelCreateRequest, current_user = Depends(get_current_user)):
+async def create_model(
+    model_data: ModelCreateRequest, current_user=Depends(get_current_user)
+):
     """Create a new model in the system.
 
     Args:
@@ -36,7 +38,7 @@ async def create_model(model_data: ModelCreateRequest, current_user = Depends(ge
 
 
 @router.get("/", response_model=List[ModelResponse])
-async def get_models(current_user = Depends(get_current_user)):
+async def get_models(current_user=Depends(get_current_user)):
     """Get all models in the system.
 
     Returns:
@@ -53,7 +55,7 @@ async def get_models(current_user = Depends(get_current_user)):
 
 
 @router.delete("/{model_name}", response_model=bool)
-async def delete_model(model_name: str, current_user = Depends(get_current_user)):
+async def delete_model(model_name: str, current_user=Depends(get_current_user)):
     """Delete a model from the system.
 
     Args:

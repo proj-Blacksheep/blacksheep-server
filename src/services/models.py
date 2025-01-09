@@ -65,14 +65,12 @@ async def delete_model_db(model_name: str) -> bool:
         ValueError: If the model with the given name does not exist.
     """
     async with async_session_maker() as session:
-        result = await session.execute(
-            select(Models).where(Models.name == model_name)
-        )
+        result = await session.execute(select(Models).where(Models.name == model_name))
         model = result.scalar_one_or_none()
-        
+
         if not model:
             raise ValueError(f"Model with name '{model_name}' not found")
-        
+
         await session.delete(model)
         await session.commit()
         return True

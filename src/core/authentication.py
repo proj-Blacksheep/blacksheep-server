@@ -20,14 +20,13 @@ class TokenData(BaseModel):
         username: The username extracted from the token.
         exp: The expiration timestamp of the token.
     """
+
     username: str
     exp: datetime
 
 
 oauth2_scheme = OAuth2PasswordBearer(
-    tokenUrl="login",
-    scheme_name="OAuth2",
-    description="JWT token authentication"
+    tokenUrl="login", scheme_name="OAuth2", description="JWT token authentication"
 )
 
 
@@ -71,7 +70,9 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
         expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    encoded_jwt = jwt.encode(
+        to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM
+    )
     return encoded_jwt
 
 
@@ -89,9 +90,7 @@ def verify_token(token: str) -> dict:
     """
     try:
         payload = jwt.decode(
-            token, 
-            settings.SECRET_KEY, 
-            algorithms=[settings.ALGORITHM]
+            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
         )
         return payload
     except JWTError as exc:
@@ -142,7 +141,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> Users:
                     )
 
                 return user
-                
+
     except HTTPException as e:
         raise e
     except Exception as e:
@@ -151,4 +150,4 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> Users:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
-        ) from e 
+        ) from e

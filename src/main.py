@@ -45,7 +45,7 @@ app = FastAPI(
         {"name": "users", "description": "User management operations"},
         {"name": "login", "description": "Authentication operations"},
         {"name": "models", "description": "Model management operations"},
-    ]
+    ],
 )
 
 app.add_middleware(

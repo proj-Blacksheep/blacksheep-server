@@ -103,14 +103,14 @@ async def update_api_key(username: str, password: str) -> str | None:
             select(Users).where(Users.username == username, Users.password == password)
         )
         user = result.scalar_one_or_none()
-        
+
         if not user:
             return None
-            
+
         user.api_key = str(uuid.uuid4().hex)
         await session.commit()
         await session.refresh(user)
-        
+
         return str(user.api_key)
 
 
@@ -144,16 +144,18 @@ async def set_usage_limit(username: str, limit: int) -> bool:
     async with async_session_maker() as session:
         result = await session.execute(select(Users).where(Users.username == username))
         user = result.scalar_one_or_none()
-        
+
         if not user:
             return False
-            
+
         user.usage_limit = limit
         await session.commit()
         return True
 
 
-async def update_password(username: str, current_password: str, new_password: str) -> bool:
+async def update_password(
+    username: str, current_password: str, new_password: str
+) -> bool:
     """Update user's password.
 
     Args:
@@ -165,14 +167,14 @@ async def update_password(username: str, current_password: str, new_password: st
         bool: True if password was updated successfully, False if verification fails.
     """
     async with async_session_maker() as session:
-        result = await session.execute(
-            select(Users).where(Users.username == username)
-        )
+        result = await session.execute(select(Users).where(Users.username == username))
         user = result.scalar_one_or_none()
-        
-        if not user or user.password != current_password:  # TODO: 실제 구현시 비밀번호 해싱 필요
+
+        if (
+            not user or user.password != current_password
+        ):  # TODO: 실제 구현시 비밀번호 해싱 필요
             return False
-            
+
         user.password = new_password
         await session.commit()
         return True
