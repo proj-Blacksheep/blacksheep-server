@@ -1,5 +1,10 @@
-from datetime import datetime, timedelta, UTC
-from typing import Optional
+"""Authentication module.
+
+This module provides functions for user authentication and token management.
+"""
+
+from datetime import UTC, datetime, timedelta
+from typing import Any, Optional, cast
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -8,9 +13,8 @@ from pydantic import BaseModel
 from sqlalchemy import select
 
 from src.core.config import settings
-from src.db.database import async_session_maker
-from src.models.models import UserResponse
-from src.models.users import Users, UserSchema
+from src.db.database import get_session
+from src.models.users import Users
 
 
 class TokenData(BaseModel):
@@ -30,7 +34,7 @@ oauth2_scheme = OAuth2PasswordBearer(
 )
 
 
-async def authenticate_user(username: str, password: str) -> UserSchema | None:
+async def authenticate_user(username: str, password: str) -> Optional[Users]:
     """Authenticate a user with username and password.
 
     Args:
@@ -38,24 +42,25 @@ async def authenticate_user(username: str, password: str) -> UserSchema | None:
         password: The password to verify.
 
     Returns:
-        UserSchema | None: Authenticated user or None if authentication fails.
+        Optional[Users]: Authenticated user or None if authentication fails.
     """
-    async with async_session_maker() as session:
-        async with session.begin():
-            query = select(Users).where(Users.username == username)
-            result = await session.execute(query)
-            user = result.scalar_one_or_none()
+    async with get_session() as session:
+        query = select(Users).where(Users.username == username)
+        result = await session.execute(query)
+        user = result.scalar_one_or_none()
 
-            if user is None:
-                return None
+        if user is None:
+            return None
 
-            if user.password != password:  # TODO: 실제 구현시 비밀번호 해싱 필요
-                return None
+        if user.password != password:  # TODO: 실제 구현시 비밀번호 해싱 필요
+            return None
 
-            return user
+        return cast(Users, user)
 
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(
+    data: dict[str, Any], expires_delta: Optional[timedelta] = None
+) -> str:
     """Creates a JWT access token.
 
     Args:
@@ -76,78 +81,39 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     return encoded_jwt
 
 
-def verify_token(token: str) -> dict:
-    """Verifies a JWT token and returns its payload.
+async def get_current_user(token: str = Depends(oauth2_scheme)) -> Users:
+    """Get current user from JWT token.
 
     Args:
-        token: JWT token to verify.
+        token: JWT token from request.
 
     Returns:
-        dict: Dictionary containing the token claims.
+        Users: Current authenticated user.
 
     Raises:
-        HTTPException: If token is invalid or expired.
+        HTTPException: If token is invalid or user not found.
     """
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
     try:
         payload = jwt.decode(
             token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
         )
-        return payload
-    except JWTError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        ) from exc
-
-
-async def get_current_user(token: str = Depends(oauth2_scheme)) -> Users:
-    """Validates the JWT token and returns the current authenticated user.
-
-    This function extracts the JWT token from the request headers, validates it,
-    and returns the authenticated user information. It serves as a dependency
-    for protected endpoints.
-
-    Args:
-        token: The JWT token from the request.
-
-    Returns:
-        Users: The authenticated user object.
-
-    Raises:
-        HTTPException: If the token is invalid, expired, or the user is not found.
-    """
-    try:
-        payload = verify_token(token)
-        username: str = payload.get("sub")
+        username: str = cast(str, payload.get("sub"))
         if username is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token payload",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+            raise credentials_exception
+        token_data = TokenData(username=username, exp=payload.get("exp"))
+    except JWTError:
+        raise credentials_exception
 
-        async with async_session_maker() as session:
-            async with session.begin():
-                query = select(Users).where(Users.username == username)
-                result = await session.execute(query)
-                user = result.scalar_one_or_none()
-
-                if user is None:
-                    raise HTTPException(
-                        status_code=status.HTTP_401_UNAUTHORIZED,
-                        detail="User not found",
-                        headers={"WWW-Authenticate": "Bearer"},
-                    )
-
-                return user
-
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        print(e)
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        ) from e
+    async with get_session() as session:
+        result = await session.execute(
+            select(Users).where(Users.username == token_data.username)
+        )
+        user = result.scalar_one_or_none()
+        if user is None:
+            raise credentials_exception
+        return cast(Users, user)

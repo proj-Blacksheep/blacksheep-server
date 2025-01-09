@@ -1,56 +1,46 @@
-"""Database configuration and session management module.
+"""Database configuration module.
 
-This module sets up the SQLAlchemy database connection and provides session management
-functionality for the application.
+This module provides database connection and session management functionality.
 """
 
+from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-# Create declarative base
+from src.core.config import settings
+
 Base = declarative_base()
 
-# Database URL configuration
-SQLALCHEMY_DATABASE_URL = "sqlite+aiosqlite:///./sql_app.db"
-
-# Create engine instance
 engine: AsyncEngine = create_async_engine(
-    SQLALCHEMY_DATABASE_URL,
-    echo=True,  # Set to False in production
+    settings.DATABASE_URL, echo=settings.DB_ECHO, future=True
 )
 
-# Create async session maker
-async_session_maker = sessionmaker(
+AsyncSessionLocal = sessionmaker(
     engine,
     class_=AsyncSession,
     expire_on_commit=False,
+    autocommit=False,
     autoflush=False,
 )
 
 
-async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
-    """Provide a transactional scope around a series of operations.
+@asynccontextmanager
+async def get_session() -> AsyncGenerator[AsyncSession, None]:
+    """Get an async database session.
 
     Yields:
         AsyncSession: The database session.
-
-    Example:
-        async with get_async_session() as session:
-            result = await session.execute(query)
-            await session.commit()
     """
-    session = async_session_maker()
+    session = AsyncSessionLocal()
     try:
         yield session
     except Exception:
-        if session:
-            await session.rollback()  # type: ignore
+        await session.rollback()  # type: ignore[func-returns-value]
         raise
     finally:
-        if session:
-            await session.close()  # type: ignore
+        await session.close()  # type: ignore[func-returns-value]
 
 
 async def init_db() -> None:

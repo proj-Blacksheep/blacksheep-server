@@ -1,290 +1,262 @@
-from typing import List
-from fastapi import APIRouter, HTTPException, Depends
-from src.models.users import UserResponse, UserSchema, Users
+"""User API endpoints module.
+
+This module provides API endpoints for user management operations including
+user creation, deletion, and updates.
+"""
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy import select
+
+from src.core.authentication import (
+    authenticate_user,
+    create_access_token,
+    get_current_user,
+)
+from src.db.database import get_session
+from src.models.models import Token, UserCreate, UserResponse
+from src.models.users import Users
+from src.services.user_model_usage import get_usage_by_user_name
 from src.services.users import (
     create_user_db,
-    get_all_users,
     delete_user,
+    get_all_users,
     set_usage_limit,
     update_password,
 )
-from src.services.user_model_usage import get_usage_by_user_name
-from src.core.authentication import get_current_user
-from src.db.database import async_session_maker
-from pydantic import BaseModel
-import uuid
-from sqlalchemy import select
 
-router = APIRouter(prefix="/users", tags=["users"])
+router = APIRouter(
+    prefix="/users",
+    tags=["users"],
+    responses={404: {"description": "Not found"}},
+)
 
 
-class UsageLimitRequest(BaseModel):
-    username: str
-    limit: int
+@router.post("/token", response_model=Token)
+async def login_for_access_token(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+) -> Token:
+    """Authenticate user and provide access token.
 
+    Args:
+        form_data: OAuth2 password request form containing username and password.
 
-class UpdatePasswordRequest(BaseModel):
-    """Request model for password update.
+    Returns:
+        Token: Access token for authenticated user.
 
-    Attributes:
-        current_password: The current password for verification.
-        new_password: The new password to set.
+    Raises:
+        HTTPException: If authentication fails.
     """
-
-    current_password: str
-    new_password: str
+    user = await authenticate_user(form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token = create_access_token(data={"sub": user.username})
+    return Token(access_token=access_token, token_type="bearer")
 
 
 @router.post("/create", response_model=UserResponse)
-async def create_user_endpoint(
-    user_data: UserSchema,
+async def create_user(user: UserCreate) -> UserResponse:
+    """Create a new user.
+
+    Args:
+        user: User creation request containing username, password, and role.
+
+    Returns:
+        UserResponse: Created user information.
+
+    Raises:
+        HTTPException: If user creation fails.
+    """
+    db_user = await create_user_db(user.username, user.password, user.role)
+    if not db_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to create user",
+        )
+    return UserResponse(
+        username=db_user.username,
+        role=db_user.role,
+        api_key=db_user.api_key,
+    )
+
+
+@router.get("/me", response_model=UserResponse)
+async def read_users_me(
     current_user: Users = Depends(get_current_user),
-):
-    """Create a new user in the system.
-
-    Only admin users can create new users.
+) -> UserResponse:
+    """Get current user information.
 
     Args:
-        user_data: The user information required for creation.
-        current_user: The currently authenticated user.
+        current_user: Current authenticated user.
 
     Returns:
-        User: The created user object.
+        UserResponse: Current user information.
+    """
+    return UserResponse(
+        username=current_user.username,
+        role=current_user.role,
+        api_key=current_user.api_key,
+    )
+
+
+@router.get("/all", response_model=list[UserResponse])
+async def read_all_users(
+    current_user: Users = Depends(get_current_user),
+) -> list[UserResponse]:
+    """Get all users information.
+
+    Args:
+        current_user: Current authenticated user.
+
+    Returns:
+        list[UserResponse]: List of all users information.
 
     Raises:
-        HTTPException: If user creation fails, validation error occurs, or user lacks permission.
+        HTTPException: If user is not authorized.
     """
     if current_user.role != "admin":
         raise HTTPException(
-            status_code=403,
-            detail="Only admin users can create new users",
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions",
         )
-
-    try:
-        user = await create_user_db(
-            username=user_data.username,
-            password=user_data.password,
-            role=user_data.role,
-        )
-        return UserResponse(username=user.username, role=user.role)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+    users = await get_all_users()
+    return [
+        UserResponse(username=user.username, role=user.role, api_key=user.api_key)
+        for user in users
+    ]
 
 
-@router.get("/", response_model=List[UserResponse])
-async def get_users(current_user: Users = Depends(get_current_user)):
-    """Get all users in the system.
-
-    Only admin users can view all users.
+@router.get("/usage/{username}", response_model=dict)
+async def get_user_usage(
+    username: str, current_user: Users = Depends(get_current_user)
+) -> dict:
+    """Get user's API usage statistics.
 
     Args:
-        current_user: The currently authenticated user.
+        username: Username to get usage for.
+        current_user: Current authenticated user.
 
     Returns:
-        List[UserResponse]: List of all users.
+        dict: User's API usage statistics.
 
     Raises:
-        HTTPException: If there's an error retrieving users or user lacks permission.
+        HTTPException: If user is not authorized or not found.
     """
-    if current_user.role != "admin":
+    if current_user.role != "admin" and current_user.username != username:
         raise HTTPException(
-            status_code=403,
-            detail="Only admin users can view all users",
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions",
         )
 
-    try:
-        users = await get_all_users()
-        return [UserResponse(username=user.username, role=user.role) for user in users]
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
-
-
-@router.get("/get_api_key")
-async def get_api_key(current_user: Users = Depends(get_current_user)):
-    """Get API key of the currently authenticated user.
-
-    Args:
-        current_user: The currently authenticated user from JWT.
-
-    Returns:
-        JSON response with API key.
-    """
-    return {"api_key": current_user.api_key}
-
-
-@router.post("/update_api_key")
-async def update_user_api_key(current_user: Users = Depends(get_current_user)):
-    """Update API key of the currently authenticated user.
-
-    Args:
-        current_user: The currently authenticated user from JWT.
-
-    Returns:
-        JSON response with new API key.
-
-    Raises:
-        HTTPException: If update fails.
-    """
-    async with async_session_maker() as session:
-        # Get fresh user object in current session
-        result = await session.execute(
-            select(Users).where(Users.username == current_user.username)
-        )
+    async with get_session() as session:
+        result = await session.execute(select(Users).where(Users.username == username))
         user = result.scalar_one_or_none()
+
         if not user:
             raise HTTPException(
-                status_code=404,
+                status_code=status.HTTP_404_NOT_FOUND,
                 detail="User not found",
             )
 
-        # Update API key
-        user.api_key = str(uuid.uuid4().hex)
-        await session.commit()
-        return {"api_key": user.api_key}
+    usage = await get_usage_by_user_name(username)
+    return {"username": username, "usage": usage}
 
 
-@router.get("/usage")
-async def get_usage(
-    current_user: Users = Depends(get_current_user),
-    username: str | None = None,
-):
-    """Get model usage statistics for a user.
-
-    Basic users can only view their own usage.
-    Admin users can view any user's usage.
+@router.post("/limit/{username}")
+async def set_user_limit(
+    username: str, limit: int, current_user: Users = Depends(get_current_user)
+) -> dict:
+    """Set usage limit for a user.
 
     Args:
-        current_user: The currently authenticated user.
-        username: Optional username to fetch usage for (admin only).
-
-    Returns:
-        dict: A dictionary containing user's model usage statistics.
-
-    Raises:
-        HTTPException: If user is not found or other errors occur.
-    """
-    try:
-        target_username = username if username else current_user.username
-
-        if current_user.role != "admin" and target_username != current_user.username:
-            raise HTTPException(
-                status_code=403,
-                detail="Basic users can only view their own usage",
-            )
-
-        usage = await get_usage_by_user_name(target_username)
-        return usage
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
-
-
-@router.delete("/delete/{username}")
-async def delete_user_endpoint(
-    username: str,
-    current_user: Users = Depends(get_current_user),
-):
-    """Delete a user from the system.
-
-    Only admin users can delete users.
-
-    Args:
-        username: The username of the user to delete.
-        current_user: The currently authenticated user.
+        username: Username to set limit for.
+        limit: New usage limit.
+        current_user: Current authenticated user.
 
     Returns:
         dict: Success message.
 
     Raises:
-        HTTPException: If user deletion fails or user lacks permission.
+        HTTPException: If user is not authorized or operation fails.
     """
     if current_user.role != "admin":
         raise HTTPException(
-            status_code=403,
-            detail="Only admin users can delete users",
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions",
         )
 
-    if username == current_user.username:
+    success = await set_usage_limit(username, limit)
+    if not success:
         raise HTTPException(
-            status_code=400,
-            detail="Cannot delete your own account",
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    return {"message": f"Usage limit for {username} set to {limit}"}
+
+
+@router.delete("/{username}")
+async def remove_user(
+    username: str, current_user: Users = Depends(get_current_user)
+) -> dict:
+    """Delete a user.
+
+    Args:
+        username: Username to delete.
+        current_user: Current authenticated user.
+
+    Returns:
+        dict: Success message.
+
+    Raises:
+        HTTPException: If user is not authorized or operation fails.
+    """
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions",
         )
 
     success = await delete_user(username)
     if not success:
         raise HTTPException(
-            status_code=404,
-            detail=f"User '{username}' not found",
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
         )
 
-    return {"message": f"User '{username}' successfully deleted"}
+    return {"message": f"User {username} deleted successfully"}
 
 
-@router.post("/set_usage_limit", deprecated=True)
-async def set_user_usage_limit(
-    request: UsageLimitRequest,
+@router.post("/password")
+async def change_password(
+    current_password: str,
+    new_password: str,
     current_user: Users = Depends(get_current_user),
-):
-    """Set usage limit for a user.
-
-    Only admin users can set usage limits.
+) -> dict:
+    """Change user's password.
 
     Args:
-        request: Request containing username and new limit.
-        current_user: The currently authenticated user.
+        current_password: Current password for verification.
+        new_password: New password to set.
+        current_user: Current authenticated user.
 
     Returns:
         dict: Success message.
 
     Raises:
-        HTTPException: If setting limit fails or user lacks permission.
-    """
-    if current_user.role != "admin":
-        raise HTTPException(
-            status_code=403,
-            detail="Only admin users can set usage limits",
-        )
-
-    success = await set_usage_limit(request.username, request.limit)
-    if not success:
-        raise HTTPException(
-            status_code=404,
-            detail=f"User '{request.username}' not found",
-        )
-
-    return {
-        "message": f"Usage limit for user '{request.username}' set to {request.limit}"
-    }
-
-
-@router.post("/update_password")
-async def update_user_password(
-    request: UpdatePasswordRequest,
-    current_user: Users = Depends(get_current_user),
-):
-    """Update password of the currently authenticated user.
-
-    Args:
-        request: Request containing current and new passwords.
-        current_user: The currently authenticated user from JWT.
-
-    Returns:
-        dict: Success message.
-
-    Raises:
-        HTTPException: If password update fails or verification fails.
+        HTTPException: If password change fails.
     """
     success = await update_password(
-        username=current_user.username,
-        current_password=request.current_password,
-        new_password=request.new_password,
+        str(current_user.username), current_password, new_password
     )
-
     if not success:
         raise HTTPException(
-            status_code=401,
-            detail="현재 비밀번호가 일치하지 않습니다",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid current password",
         )
 
-    return {"message": "비밀번호가 성공적으로 변경되었습니다"}
+    return {"message": "Password updated successfully"}

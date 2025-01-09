@@ -1,37 +1,47 @@
+"""Configuration module for the application.
+
+This module provides configuration settings using Pydantic's BaseSettings.
+It loads configuration from environment variables and provides default values.
+"""
+
 from functools import lru_cache
-from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    """
-    Application settings.
+    """Application settings.
 
     Attributes:
-        PROJECT_NAME: Name of the project
-        DEBUG: Debug mode flag
-        API_V1_STR: API version path
-        DATABASE_URL: SQLite database URL
+        VERSION: Application version.
+        ENVIRONMENT: Environment (development, staging, production).
+        SECRET_KEY: Secret key for JWT token encoding.
+        ALGORITHM: Algorithm used for JWT token encoding.
+        ACCESS_TOKEN_EXPIRE_MINUTES: Token expiration time in minutes.
+        DEFAULT_ADMIN_USERNAME: Default admin username.
+        DEFAULT_ADMIN_PASSWORD: Default admin password.
+        DATABASE_URL: Database connection URL.
+        DB_ECHO: Whether to echo SQL statements.
     """
 
-    model_config = SettingsConfigDict(env_file=".env")
-
-    PROJECT_NAME: str = "FastAPI Template"
-    DEBUG: bool = True
-    API_V1_STR: str = "/api/v1"
-
-    DATABASE_URL: str = "sqlite:///./sql_app.db"
-
-    # JWT 토큰 생성 시 사용할 비밀 키
+    VERSION: str = "1.0.0"
+    ENVIRONMENT: str = "development"
     SECRET_KEY: str = "your-secret-key"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-
     DEFAULT_ADMIN_USERNAME: str = "admin"
     DEFAULT_ADMIN_PASSWORD: str = "admin"
+    DATABASE_URL: str = "sqlite+aiosqlite:///./sql_app.db"
+    DB_ECHO: bool = False
 
 
-@lru_cache
+@lru_cache()
 def get_settings() -> Settings:
+    """Get application settings.
+
+    Returns:
+        Settings: Application settings instance.
+    """
     return Settings()
 
 

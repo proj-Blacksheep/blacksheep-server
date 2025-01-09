@@ -1,121 +1,94 @@
+"""User model usage service module.
+
+This module provides functions for managing user model usage records.
+"""
+
+from typing import Dict
+
+from sqlalchemy import select
+
+from src.db.database import get_session
 from src.models.user_model_usage import UserModelUsage
 from src.models.users import Users
-from src.models.models import Models
-from src.db.database import async_session_maker
-from sqlalchemy import select
-from sqlalchemy.orm import joinedload
 
 
-async def user_model_usage(
-    user_name: int,
-    model_name: int,
-    input_tokens: int,
-    output_tokens: int,
-    total_tokens: int,
-):
-    """Create a new user model usage record.
+async def get_usage_by_user_name(username: str) -> Dict[str, int]:
+    """Get model usage statistics for a user.
 
     Args:
-        user_name: The ID of the user.
-        model_name: The ID of the model.
-        input_tokens: Number of input tokens used.
-        output_tokens: Number of output tokens used.
-        total_tokens: Total number of tokens used.
+        username: The username to get usage for.
 
     Returns:
-        UserModelUsage: The created user model usage record.
+        Dict[str, int]: Dictionary containing usage statistics.
     """
-    async with async_session_maker() as session:
-        new_user_model_usage = UserModelUsage(
-            user_id=user_name,
-            model_id=model_name,
-            input_tokens=input_tokens,
-            output_tokens=output_tokens,
-            total_tokens=total_tokens,
-        )
-
-        session.add(new_user_model_usage)
-        await session.commit()
-        await session.refresh(new_user_model_usage)
-
-        return new_user_model_usage
-
-
-async def get_usage_by_user_name(username: str):
-    """Get all model usage records for a specific user.
-
-    Args:
-        username: The username to fetch usage records for.
-
-    Returns:
-        dict: A dictionary containing user's model usage statistics.
-        Format:
-        {
-            "total_usage": {
-                "input_tokens": int,
-                "output_tokens": int,
-                "total_tokens": int
-            },
-            "model_usage": [
-                {
-                    "model_name": str,
-                    "input_tokens": int,
-                    "output_tokens": int,
-                    "total_tokens": int
-                },
-                ...
-            ]
-        }
-
-    Raises:
-        ValueError: If the user is not found.
-    """
-    async with async_session_maker() as session:
-        # Get user ID from username
-        user_query = select(Users).where(Users.username == username)
-        user_result = await session.execute(user_query)
-        user = user_result.scalar_one_or_none()
-
+    async with get_session() as session:
+        # Get user ID
+        result = await session.execute(select(Users).where(Users.username == username))
+        user = result.scalar_one_or_none()
         if not user:
-            raise ValueError(f"사용자를 찾을 수 없습니다: {username}")
+            return {}
 
-        # Get all usage records for the user
-        usage_query = (
-            select(UserModelUsage, Models)
-            .join(Models, UserModelUsage.model_id == Models.id)
-            .where(UserModelUsage.user_id == user.id)
+        # Get usage records
+        result = await session.execute(
+            select(UserModelUsage).where(UserModelUsage.user_id == user.id)
         )
+        usage_records = result.scalars().all()
 
-        usage_results = await session.execute(usage_query)
-        usage_records = usage_results.all()
-
-        # Initialize response structure
-        response = {
-            "total_usage": {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0},
-            "model_usage": [],
+        # Aggregate usage
+        usage_stats = {
+            "total_usage": sum(record.usage_count for record in usage_records),
+            "by_type": {},
         }
 
-        # Group usage by model
-        model_usage_map = {}
+        for record in usage_records:
+            if record.usage_type not in usage_stats["by_type"]:
+                usage_stats["by_type"][record.usage_type] = 0
+            usage_stats["by_type"][record.usage_type] += record.usage_count
 
-        for usage, model in usage_records:
-            # Update total usage
-            response["total_usage"]["input_tokens"] += usage.input_tokens
-            response["total_usage"]["output_tokens"] += usage.output_tokens
-            response["total_usage"]["total_tokens"] += usage.total_tokens
+        return usage_stats
 
-            # Update or create model specific usage
-            if model.name not in model_usage_map:
-                model_usage_map[model.name] = {
-                    "model_name": model.name,
-                    "input_tokens": 0,
-                    "output_tokens": 0,
-                    "total_tokens": 0,
-                }
 
-            model_usage_map[model.name]["input_tokens"] += usage.input_tokens
-            model_usage_map[model.name]["output_tokens"] += usage.output_tokens
-            model_usage_map[model.name]["total_tokens"] += usage.total_tokens
+async def record_model_usage(
+    username: str, model_id: int, usage_type: str, count: int = 1
+) -> bool:
+    """Record model usage for a user.
 
-        response["model_usage"] = list(model_usage_map.values())
-        return response
+    Args:
+        username: The username of the user.
+        model_id: The ID of the model used.
+        usage_type: The type of usage.
+        count: The number of times the model was used.
+
+    Returns:
+        bool: True if usage was recorded successfully, False otherwise.
+    """
+    async with get_session() as session:
+        # Get user ID
+        result = await session.execute(select(Users).where(Users.username == username))
+        user = result.scalar_one_or_none()
+        if not user:
+            return False
+
+        # Create or update usage record
+        result = await session.execute(
+            select(UserModelUsage).where(
+                UserModelUsage.user_id == user.id,
+                UserModelUsage.model_id == model_id,
+                UserModelUsage.usage_type == usage_type,
+            )
+        )
+        usage_record = result.scalar_one_or_none()
+
+        if usage_record:
+            usage_record.usage_count += count
+        else:
+            usage_record = UserModelUsage(
+                user_id=user.id,
+                model_id=model_id,
+                usage_type=usage_type,
+                usage_count=count,
+            )
+            session.add(usage_record)
+
+        await session.commit()
+        return True

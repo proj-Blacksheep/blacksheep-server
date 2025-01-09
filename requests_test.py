@@ -4,7 +4,7 @@ This module provides functionality to test the API endpoints by making POST requ
 with specific JSON payloads and handling the responses.
 """
 
-from typing import Any
+from typing import Any, cast
 
 import requests
 
@@ -62,7 +62,7 @@ def call_api() -> dict[str, Any]:
     try:
         response = requests.post(url, headers=headers, json=payload)
         response.raise_for_status()  # 에러 발생 시 예외를 발생시킵니다
-        return response.json()
+        return cast(dict[str, Any], response.json())
     except requests.RequestException as e:
         print(f"API 호출 중 오류가 발생했습니다: {e}")
         raise

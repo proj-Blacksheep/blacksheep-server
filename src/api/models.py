@@ -1,77 +1,117 @@
-from typing import List
-from fastapi import APIRouter, HTTPException, Depends
-from src.models.models import ModelResponse, ModelCreateRequest
-from src.services.models import create_model_db, get_all_models, delete_model_db
+"""Model API endpoints module.
+
+This module provides API endpoints for model management operations including
+model creation, deletion, and updates.
+"""
+
+from typing import Any, Dict, List
+
+from fastapi import APIRouter, Depends, HTTPException, status
+
 from src.core.authentication import get_current_user
+from src.models.users import Users
+from src.services.models import create_model_db, delete_model, get_all_models
 
-router = APIRouter(prefix="/models", tags=["models"])
+router = APIRouter(
+    prefix="/models",
+    tags=["models"],
+    responses={404: {"description": "Not found"}},
+)
 
 
-@router.post("/create", response_model=ModelResponse)
+@router.post("/create")
 async def create_model(
-    model_data: ModelCreateRequest, current_user=Depends(get_current_user)
-):
-    """Create a new model in the system.
+    model_name: str,
+    model_type: str,
+    current_user: Users = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Create a new model.
 
     Args:
-        model_data: The model information required for creation.
-        current_user: The authenticated user making the request.
+        model_name: Name of the model to create.
+        model_type: Type of the model.
+        current_user: Current authenticated user.
 
     Returns:
-        ModelResponse: The created model object.
+        Dict[str, Any]: Created model information.
 
     Raises:
-        HTTPException: If model creation fails, validation error occurs, or user is not authenticated.
+        HTTPException: If model creation fails or user is not authorized.
     """
-
-    try:
-        model = await create_model_db(
-            name=model_data.name,
-            description=model_data.description,
-            model_endpoint=model_data.model_endpoint,
-            model_name=model_data.model_name,
-            model_api_key=model_data.model_api_key,
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions",
         )
-        return model
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    model = await create_model_db(model_name, model_type)
+    if not model:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to create model",
+        )
+
+    return {
+        "model_name": model.model_name,
+        "model_type": model.model_type,
+        "created_at": model.created_at,
+    }
 
 
-@router.get("/", response_model=List[ModelResponse])
-async def get_models(current_user=Depends(get_current_user)):
-    """Get all models in the system.
-
-    Returns:
-        List[ModelResponse]: List of all models.
-
-    Raises:
-        HTTPException: If there's an error retrieving models.
-    """
-    try:
-        models = await get_all_models()
-        return models
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
-
-
-@router.delete("/{model_name}", response_model=bool)
-async def delete_model(model_name: str, current_user=Depends(get_current_user)):
-    """Delete a model from the system.
+@router.get("/all")
+async def get_models(
+    current_user: Users = Depends(get_current_user),
+) -> List[Dict[str, Any]]:
+    """Get all models.
 
     Args:
-        model_name: The name of the model to delete.
-        current_user: The authenticated user making the request.
+        current_user: Current authenticated user.
 
     Returns:
-        bool: True if deletion was successful.
+        List[Dict[str, Any]]: List of all models information.
 
     Raises:
-        HTTPException: If model deletion fails or model is not found.
+        HTTPException: If user is not authorized.
     """
-    try:
-        result = await delete_model_db(model_name)
-        return result
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+    models = await get_all_models()
+    return [
+        {
+            "model_name": model.model_name,
+            "model_type": model.model_type,
+            "created_at": model.created_at,
+        }
+        for model in models
+    ]
+
+
+@router.delete("/{model_name}")
+async def remove_model(
+    model_name: str,
+    current_user: Users = Depends(get_current_user),
+) -> Dict[str, str]:
+    """Delete a model.
+
+    Args:
+        model_name: Name of the model to delete.
+        current_user: Current authenticated user.
+
+    Returns:
+        Dict[str, str]: Success message.
+
+    Raises:
+        HTTPException: If model deletion fails or user is not authorized.
+    """
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions",
+        )
+
+    success = await delete_model(model_name)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Model not found",
+        )
+
+    return {"message": f"Model {model_name} deleted successfully"}
