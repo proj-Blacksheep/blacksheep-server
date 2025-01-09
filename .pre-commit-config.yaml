@@ -40,6 +40,7 @@ repos:
         additional_dependencies:
           - types-sqlalchemy
           - types-python-jose
+          - types-requests
         args: [
           "--ignore-missing-imports",
           "--disallow-untyped-defs",
