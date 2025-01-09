@@ -24,7 +24,6 @@ async def lifespan(app: FastAPI):
     """
     await init_db()
 
-    # Create default admin user if not exists
     try:
         await create_user_db(
             username=settings.DEFAULT_ADMIN_USERNAME,
@@ -32,7 +31,6 @@ async def lifespan(app: FastAPI):
             role="admin",
         )
     except IntegrityError:
-        # User already exists, ignore the error
         pass
 
     yield
@@ -43,9 +41,13 @@ app = FastAPI(
     description="FastAPI 프로젝트 템플릿",
     version="1.0.0",
     lifespan=lifespan,
+    openapi_tags=[
+        {"name": "users", "description": "User management operations"},
+        {"name": "login", "description": "Authentication operations"},
+        {"name": "models", "description": "Model management operations"},
+    ]
 )
 
-# CORS 미들웨어 설정
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -65,7 +67,6 @@ async def health_check():
     return {"status": "OK"}
 
 
-# 라우터 등록
 app.include_router(users_router)
 app.include_router(login_router)
 app.include_router(models_router)

@@ -33,3 +33,17 @@ class ModelCreateRequest(BaseModel):
     model_endpoint: str
     model_api_key: str
     model_name: str
+
+
+class UserResponse(BaseModel):
+    """Response model for user data.
+
+    Attributes:
+        id: The user's unique identifier.
+        username: The user's username.
+        email: The user's email address.
+        role: The user's role in the system.
+    """
+    id: int
+    username: str
+    role: str

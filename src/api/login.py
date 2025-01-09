@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from fastapi.security import OAuth2PasswordRequestForm
-from src.services.login import create_access_token, authenticate_user
+from src.core.authentication import create_access_token, authenticate_user
 
 
 router = APIRouter(tags=["login"])
@@ -19,7 +19,6 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     Raises:
         HTTPException: If authentication fails.
     """
-    # 여기서 사용자 검증 로직 구현
     user = await authenticate_user(form_data.username, form_data.password)
 
     if not user:
@@ -29,7 +28,11 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # JWT 토큰 생성
     access_token = create_access_token(data={"sub": user.username})
 
-    return {"access_token": access_token, "role": user.role}
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "role": user.role
+    }
+

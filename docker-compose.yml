@@ -1,8 +1,6 @@
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: wjdqlsdlsp/black-sheep:latest
     ports:
       - "8000:8000"
     volumes:
