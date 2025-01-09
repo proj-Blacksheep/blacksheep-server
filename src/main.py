@@ -1,72 +1,76 @@
-from contextlib import asynccontextmanager
+"""FastAPI application entry point.
+
+This module initializes the FastAPI application, sets up CORS middleware,
+includes routers, and provides health check endpoints.
+"""
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from src.db.database import init_db
-from src.api.users import router as users_router
-from src.api.login import router as login_router
+
+from src.api import call_api, login, models, users
 from src.core.config import settings
+from src.db.database import init_db
 from src.services.users import create_user_db
-from sqlalchemy.exc import IntegrityError
-from src.api.models import router as models_router
-from src.api.call_api import router as call_api_router
+
+app = FastAPI(
+    title="BlackSheep API",
+    description="API for managing AI model access and usage",
+    version="1.0.0",
+)
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
+
+# Include routers
+app.include_router(login.router)
+app.include_router(users.router)
+app.include_router(models.router)
+app.include_router(call_api.router)
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """
-    Application startup and shutdown events.
+@app.on_event("startup")
+async def startup_event() -> None:
+    """Initialize database and other startup tasks.
 
-    This context manager handles database initialization and creates a default admin user
-    if one doesn't exist.
-
-    Args:
-        app: The FastAPI application instance.
+    This function is called when the application starts up.
+    It initializes the database by creating all necessary tables
+    and creates a default admin user if it doesn't exist.
     """
     await init_db()
 
-    # Create default admin user if not exists
-    try:
-        await create_user_db(
-            username=settings.DEFAULT_ADMIN_USERNAME,
-            password=settings.DEFAULT_ADMIN_PASSWORD,
-            role="admin",
-        )
-    except IntegrityError:
-        # User already exists, ignore the error
-        pass
-
-    yield
-
-
-app = FastAPI(
-    title="FastAPI Template",
-    description="FastAPI 프로젝트 템플릿",
-    version="1.0.0",
-    lifespan=lifespan,
-)
-
-# CORS 미들웨어 설정
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+    # Create default admin user
+    await create_user_db(
+        username=settings.DEFAULT_ADMIN_USERNAME,
+        password=settings.DEFAULT_ADMIN_PASSWORD,
+        role="admin",
+    )
 
 
 @app.get("/")
-async def root():
-    return {"message": "Hello World"}
+async def root() -> dict:
+    """Root endpoint for health check.
+
+    Returns:
+        dict: Basic health check response.
+    """
+    return {"status": "healthy", "message": "BlackSheep API is running"}
 
 
 @app.get("/health")
-async def health_check():
-    return {"status": "OK"}
+async def health_check() -> dict:
+    """Health check endpoint.
 
-
-# 라우터 등록
-app.include_router(users_router)
-app.include_router(login_router)
-app.include_router(models_router)
-app.include_router(call_api_router)
+    Returns:
+        dict: Detailed health check response.
+    """
+    return {
+        "status": "healthy",
+        "version": settings.VERSION,
+        "environment": settings.ENVIRONMENT,
+    }
