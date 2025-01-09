@@ -2,7 +2,7 @@
 name = "blacksheep-server"
 version = "0.1.0"
 description = "BlackSheep API Server"
-authors = ["Your Name <your.email@example.com>"]
+authors = ["ppippi-dev <wjdqlsdlsp@naver.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
