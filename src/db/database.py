@@ -7,13 +7,10 @@ functionality for the application.
 from typing import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
-from sqlalchemy.orm import declarative_base, registry
-
-# Create registry
-mapper_registry = registry()
+from sqlalchemy.orm import declarative_base, sessionmaker
 
 # Create declarative base
-Base = declarative_base(metadata=mapper_registry.metadata)
+Base = declarative_base()
 
 # Database URL configuration
 SQLALCHEMY_DATABASE_URL = "sqlite+aiosqlite:///./sql_app.db"
@@ -25,8 +22,9 @@ engine: AsyncEngine = create_async_engine(
 )
 
 # Create async session maker
-AsyncSessionLocal = AsyncSession(
+async_session_maker = sessionmaker(
     engine,
+    class_=AsyncSession,
     expire_on_commit=False,
     autoflush=False,
 )
@@ -43,12 +41,16 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
             result = await session.execute(query)
             await session.commit()
     """
-    async with AsyncSessionLocal as session:
-        try:
-            yield session
-        except Exception:
-            await session.rollback()
-            raise
+    session = async_session_maker()
+    try:
+        yield session
+    except Exception:
+        if session:
+            await session.rollback()  # type: ignore
+        raise
+    finally:
+        if session:
+            await session.close()  # type: ignore
 
 
 async def init_db() -> None:
