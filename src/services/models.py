@@ -12,7 +12,9 @@ from src.db.database import get_session
 from src.models.models import Models
 
 
-async def create_model_db(model_name: str, model_type: str) -> Optional[Models]:
+async def create_model_db(
+    model_name: str, model_type: str, model_endpoint: str, model_api_key: str
+) -> Optional[Models]:
     """Create a new model in the database.
 
     Args:

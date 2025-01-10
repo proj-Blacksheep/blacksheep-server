@@ -4,18 +4,20 @@ This module provides API endpoints for user management operations including
 user creation, deletion, and updates.
 """
 
+from typing import Dict
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 
 from src.core.authentication import get_current_user
 from src.db.database import get_session
-from src.models.models import UserCreate, UserResponse
-from src.models.users import Users
+from src.schemas.v1.users import UserCreateRequest, UserDTO, UserMeResponse
 from src.services.user_model_usage import get_usage_by_user_name
 from src.services.users import (
     create_user_db,
     delete_user,
     get_all_users,
+    get_user_usage_stats,
     set_usage_limit,
     update_password,
 )
@@ -27,8 +29,8 @@ router = APIRouter(
 )
 
 
-@router.post("/create", response_model=UserResponse)
-async def create_user(user: UserCreate) -> UserResponse:
+@router.post("/create")
+async def create_user(user: UserCreateRequest) -> Dict[str, str]:
     """Create a new user.
 
     Args:
@@ -40,23 +42,23 @@ async def create_user(user: UserCreate) -> UserResponse:
     Raises:
         HTTPException: If user creation fails.
     """
-    db_user = await create_user_db(user.username, user.password, user.role)
+    db_user = await create_user_db(
+        username=user.username,
+        password=user.password,
+        is_admin=user.is_admin,
+    )
     if not db_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Failed to create user",
         )
-    return UserResponse(
-        username=db_user.username,
-        role=db_user.role,
-        api_key=db_user.api_key,
-    )
+    return {"message": f"User {db_user.username} created successfully"}
 
 
-@router.get("/me", response_model=UserResponse)
+@router.get("/me", response_model=UserMeResponse)
 async def read_users_me(
-    current_user: Users = Depends(get_current_user),
-) -> UserResponse:
+    current_user: UserDTO = Depends(get_current_user),
+) -> UserMeResponse:
     """Get current user information.
 
     Args:
@@ -65,17 +67,17 @@ async def read_users_me(
     Returns:
         UserResponse: Current user information.
     """
-    return UserResponse(
+    return UserMeResponse(
         username=current_user.username,
-        role=current_user.role,
         api_key=current_user.api_key,
+        is_admin=current_user.is_admin,
     )
 
 
-@router.get("/all", response_model=list[UserResponse])
+@router.get("/all", response_model=list[UserMeResponse])
 async def read_all_users(
-    current_user: Users = Depends(get_current_user),
-) -> list[UserResponse]:
+    current_user: UserDTO = Depends(get_current_user),
+) -> list[UserMeResponse]:
     """Get all users information.
 
     Args:
@@ -87,21 +89,23 @@ async def read_all_users(
     Raises:
         HTTPException: If user is not authorized.
     """
-    if current_user.role != "admin":
+    if not current_user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions",
         )
     users = await get_all_users()
     return [
-        UserResponse(username=user.username, role=user.role, api_key=user.api_key)
+        UserMeResponse(
+            username=user.username, is_admin=user.is_admin, api_key=user.api_key
+        )
         for user in users
     ]
 
 
 @router.get("/usage/{username}", response_model=dict)
 async def get_user_usage(
-    username: str, current_user: Users = Depends(get_current_user)
+    username: str, current_user: UserDTO = Depends(get_current_user)
 ) -> dict:
     """Get user's API usage statistics.
 
@@ -115,62 +119,24 @@ async def get_user_usage(
     Raises:
         HTTPException: If user is not authorized or not found.
     """
-    if current_user.role != "admin" and current_user.username != username:
+    if not current_user.is_admin and current_user.username != username:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions",
         )
 
-    async with get_session() as session:
-        result = await session.execute(select(Users).where(Users.username == username))
-        user = result.scalar_one_or_none()
-
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found",
-            )
-
-    usage = await get_usage_by_user_name(username)
-    return {"username": username, "usage": usage}
-
-
-@router.post("/limit/{username}")
-async def set_user_limit(
-    username: str, limit: int, current_user: Users = Depends(get_current_user)
-) -> dict:
-    """Set usage limit for a user.
-
-    Args:
-        username: Username to set limit for.
-        limit: New usage limit.
-        current_user: Current authenticated user.
-
-    Returns:
-        dict: Success message.
-
-    Raises:
-        HTTPException: If user is not authorized or operation fails.
-    """
-    if current_user.role != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions",
-        )
-
-    success = await set_usage_limit(username, limit)
-    if not success:
+    try:
+        return await get_user_usage_stats(username)
+    except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
-        )
-
-    return {"message": f"Usage limit for {username} set to {limit}"}
+            detail=str(e),
+        ) from e
 
 
 @router.delete("/{username}")
 async def remove_user(
-    username: str, current_user: Users = Depends(get_current_user)
+    username: str, current_user: UserDTO = Depends(get_current_user)
 ) -> dict:
     """Delete a user.
 
@@ -184,7 +150,7 @@ async def remove_user(
     Raises:
         HTTPException: If user is not authorized or operation fails.
     """
-    if current_user.role != "admin":
+    if not current_user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions",
@@ -204,7 +170,7 @@ async def remove_user(
 async def change_password(
     current_password: str,
     new_password: str,
-    current_user: Users = Depends(get_current_user),
+    current_user: UserDTO = Depends(get_current_user),
 ) -> dict:
     """Change user's password.
 

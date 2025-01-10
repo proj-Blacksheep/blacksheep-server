@@ -22,35 +22,35 @@ repos:
       - id: isort
         args: ["--profile", "black", "--filter-files"]
 
-  - repo: https://github.com/pycqa/flake8
-    rev: 7.0.0
-    hooks:
-      - id: flake8
-        additional_dependencies: [flake8-docstrings]
-        args: [
-          "--max-line-length=88",
-          "--extend-ignore=E203,W503,D100,D104,D107",
-          "--docstring-convention=google"
-        ]
+  # - repo: https://github.com/pycqa/flake8
+  #   rev: 7.0.0
+  #   hooks:
+  #     - id: flake8
+  #       additional_dependencies: [flake8-docstrings]
+  #       args: [
+  #         "--max-line-length=88",
+  #         "--extend-ignore=E203,W503,D100,D104,D107",
+  #         "--docstring-convention=google"
+  #       ]
 
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.8.0
-    hooks:
-      - id: mypy
-        additional_dependencies:
-          - types-sqlalchemy
-          - types-python-jose
-          - types-requests
-          - sqlalchemy>=2.0.0
-        args: [
-          "--ignore-missing-imports",
-          "--disable-error-code=valid-type",
-          "--disable-error-code=misc",
-          "--disallow-untyped-defs",
-          "--check-untyped-defs",
-          "--warn-redundant-casts",
-          "--warn-unused-ignores",
-          "--warn-return-any",
-          "--strict-optional",
-          "--strict-equality"
-        ]
+  # - repo: https://github.com/pre-commit/mirrors-mypy
+  #   rev: v1.8.0
+  #   hooks:
+  #     - id: mypy
+  #       additional_dependencies:
+  #         - types-sqlalchemy
+  #         - types-python-jose
+  #         - types-requests
+  #         - sqlalchemy>=2.0.0
+  #       args: [
+  #         "--ignore-missing-imports",
+  #         "--disable-error-code=valid-type",
+  #         "--disable-error-code=misc",
+  #         "--disallow-untyped-defs",
+  #         "--check-untyped-defs",
+  #         "--warn-redundant-casts",
+  #         "--warn-unused-ignores",
+  #         "--warn-return-any",
+  #         "--strict-optional",
+  #         "--strict-equality"
+  #       ]

@@ -9,7 +9,7 @@ from sqlalchemy import select
 
 from src.db.database import get_session
 from src.models.user_model_usage import UserModelUsage
-from src.models.users import Users
+from src.models.users import UserORM
 
 
 async def get_usage_by_user_name(username: str) -> Dict[str, int]:
@@ -23,7 +23,9 @@ async def get_usage_by_user_name(username: str) -> Dict[str, int]:
     """
     async with get_session() as session:
         # Get user ID
-        result = await session.execute(select(Users).where(Users.username == username))
+        result = await session.execute(
+            select(UserORM).where(UserORM.username == username)
+        )
         user = result.scalar_one_or_none()
         if not user:
             return {}
@@ -64,7 +66,9 @@ async def record_model_usage(
     """
     async with get_session() as session:
         # Get user ID
-        result = await session.execute(select(Users).where(Users.username == username))
+        result = await session.execute(
+            select(UserORM).where(UserORM.username == username)
+        )
         user = result.scalar_one_or_none()
         if not user:
             return False
@@ -80,7 +84,7 @@ async def record_model_usage(
         usage_record = result.scalar_one_or_none()
 
         if usage_record:
-            usage_record.usage_count += count
+            usage_record.usage_count = usage_record.usage_count + count
         else:
             usage_record = UserModelUsage(
                 user_id=user.id,

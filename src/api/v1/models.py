@@ -9,7 +9,8 @@ from typing import Any, Dict, List
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from src.core.authentication import get_current_user
-from src.models.users import Users
+from src.schemas.v1.models import ModelCreateRequest
+from src.schemas.v1.users import UserDTO
 from src.services.models import create_model_db, delete_model, get_all_models
 
 router = APIRouter(
@@ -19,48 +20,47 @@ router = APIRouter(
 )
 
 
-@router.post("/create")
+@router.post("/create", status_code=status.HTTP_200_OK)
 async def create_model(
-    model_name: str,
-    model_type: str,
-    current_user: Users = Depends(get_current_user),
-) -> Dict[str, Any]:
+    model: ModelCreateRequest,
+    current_user: UserDTO = Depends(get_current_user),
+) -> Dict[str, str]:
     """Create a new model.
 
     Args:
-        model_name: Name of the model to create.
-        model_type: Type of the model.
+        model: ModelCreateRequest.
         current_user: Current authenticated user.
 
     Returns:
-        Dict[str, Any]: Created model information.
+        Dict[str, str]: Success message with model name.
 
     Raises:
         HTTPException: If model creation fails or user is not authorized.
     """
-    if current_user.role != "admin":
+    if not current_user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions",
         )
 
-    model = await create_model_db(model_name, model_type)
+    model = await create_model_db(
+        model_name=model.model_name,
+        model_type=model.model_type,
+        model_endpoint=model.model_endpoint,
+        model_api_key=model.model_api_key,
+    )
     if not model:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Failed to create model",
         )
 
-    return {
-        "model_name": model.model_name,
-        "model_type": model.model_type,
-        "created_at": model.created_at,
-    }
+    return {"message": f"Model {model.model_name} created successfully"}
 
 
 @router.get("/all")
 async def get_models(
-    current_user: Users = Depends(get_current_user),
+    _: UserDTO = Depends(get_current_user),
 ) -> List[Dict[str, Any]]:
     """Get all models.
 
@@ -87,7 +87,7 @@ async def get_models(
 @router.delete("/{model_name}")
 async def remove_model(
     model_name: str,
-    current_user: Users = Depends(get_current_user),
+    current_user: UserDTO = Depends(get_current_user),
 ) -> Dict[str, str]:
     """Delete a model.
 
@@ -101,7 +101,7 @@ async def remove_model(
     Raises:
         HTTPException: If model deletion fails or user is not authorized.
     """
-    if current_user.role != "admin":
+    if not current_user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions",
