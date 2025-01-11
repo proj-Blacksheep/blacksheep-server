@@ -34,9 +34,11 @@ jobs:
           path: ./.venv
           key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
 
+      - name: Update Poetry lock file
+        run: poetry lock --no-update
+
       - name: Install dependencies
-        if: steps.poetry-cache.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction
+        run: poetry install --no-interaction --no-root
 
       - name: Run tests with coverage
         run: |
