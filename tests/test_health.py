@@ -33,6 +33,8 @@ async def test_health_check_async(async_client: AsyncClient) -> None:
     Args:
         async_client: AsyncClient fixture for making asynchronous requests.
     """
-    response = await async_client.get("/health")
-    assert response.status_code == 200
-    assert response.json() == {"status": "healthy"}
+    async for client in async_client:
+        response = await client.get("/health")
+        assert response.status_code == 200
+        assert response.json() == {"status": "healthy"}
+        break

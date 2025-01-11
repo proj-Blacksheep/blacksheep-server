@@ -45,20 +45,19 @@ def test_client() -> Generator[TestClient, None, None]:
         yield client
 
 
-@pytest.fixture(scope="session")
-async def async_client(test_client: TestClient) -> AsyncGenerator[AsyncClient, None]:
+@pytest.fixture
+async def async_client() -> AsyncGenerator[AsyncClient, None]:
     """Create an AsyncClient instance for asynchronous API testing.
 
     This fixture provides an HTTPX AsyncClient for making asynchronous HTTP requests
     during testing.
 
-    Args:
-        test_client: The synchronous TestClient fixture to get the base URL from.
-
-    Returns:
+    Yields:
         AsyncGenerator[AsyncClient, None]: AsyncClient instance that can be
             used for making asynchronous requests to the FastAPI application.
     """
-    base_url = str(test_client.base_url)
-    async with AsyncClient(base_url=base_url) as client:
+    client = AsyncClient(app=app, base_url="http://test")
+    try:
         yield client
+    finally:
+        await client.aclose()
