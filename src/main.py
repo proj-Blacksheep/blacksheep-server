@@ -68,14 +68,10 @@ async def root() -> dict:
 
 
 @app.get("/health")
-async def health_check() -> dict:
-    """Health check endpoint.
+async def health_check() -> dict[str, str]:
+    """Health check endpoint to verify API server status.
 
     Returns:
-        dict: Detailed health check response.
+        dict[str, str]: A dictionary containing the health status.
     """
-    return {
-        "status": "healthy",
-        "version": settings.VERSION,
-        "environment": settings.ENVIRONMENT,
-    }
+    return {"status": "healthy"}
