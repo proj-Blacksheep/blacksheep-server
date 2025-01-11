@@ -11,5 +11,9 @@ class Base(DeclarativeBase):
 class TimeStampMixin:
     """Mixin for adding timestamp columns to a model."""
 
-    created_at = Column(DateTime, server_default=text("NOW()"))
-    updated_at = Column(DateTime, server_default=text("NOW()"), onupdate=text("NOW()"))
+    created_at = Column(DateTime, server_default=text("CURRENT_TIMESTAMP"))
+    updated_at = Column(
+        DateTime,
+        server_default=text("CURRENT_TIMESTAMP"),
+        onupdate=text("CURRENT_TIMESTAMP"),
+    )

@@ -5,7 +5,7 @@ from typing import Generic, List, Optional, Type, TypeVar
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models.base import Base
+from src.db.models.base import Base
 
 T = TypeVar("T", bound=Base)
 

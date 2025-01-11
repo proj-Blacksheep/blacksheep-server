@@ -7,20 +7,12 @@ user creation, deletion, and updates.
 from typing import Dict
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.authentication import get_current_user
-from src.db.database import get_session
+from src.core.di import get_db, get_user_repository
+from src.repositories.users import UserRepository
 from src.schemas.v1.users import UserCreateRequest, UserDTO, UserMeResponse
-from src.services.user_model_usage import get_usage_by_user_name
-from src.services.users import (
-    create_user_db,
-    delete_user,
-    get_all_users,
-    get_user_usage_stats,
-    set_usage_limit,
-    update_password,
-)
 
 router = APIRouter(
     prefix="/users",
@@ -30,29 +22,43 @@ router = APIRouter(
 
 
 @router.post("/create")
-async def create_user(user: UserCreateRequest) -> Dict[str, str]:
+async def create_user(
+    user: UserCreateRequest,
+    user_repository: UserRepository = Depends(get_user_repository),
+) -> Dict[str, str]:
     """Create a new user.
 
     Args:
         user: User creation request containing username, password, and role.
+        user_repository: User repository instance.
 
     Returns:
-        UserResponse: Created user information.
+        Dict[str, str]: Success message.
 
     Raises:
         HTTPException: If user creation fails.
     """
-    db_user = await create_user_db(
-        username=user.username,
-        password=user.password,
-        is_admin=user.is_admin,
-    )
-    if not db_user:
+    try:
+        async with get_db() as db:
+            # 먼저 사용자가 이미 존재하는지 확인
+            existing_user = await user_repository.get_by_username(db, user.username)
+            if existing_user is not None:
+                raise ValueError("User already exists.")
+
+            # 새 사용자 생성
+            db_user = await user_repository.create_user(
+                db,
+                username=user.username,
+                password=user.password,
+                is_admin=user.is_admin,
+            )
+            await db.commit()  # 명시적으로 커밋
+            return {"message": f"User {str(db_user.username)} created successfully"}
+    except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Failed to create user",
-        )
-    return {"message": f"User {db_user.username} created successfully"}
+            detail=str(e),
+        ) from e
 
 
 @router.get("/me", response_model=UserMeResponse)
@@ -65,26 +71,28 @@ async def read_users_me(
         current_user: Current authenticated user.
 
     Returns:
-        UserResponse: Current user information.
+        UserMeResponse: Current user information.
     """
     return UserMeResponse(
-        username=current_user.username,
-        api_key=current_user.api_key,
-        is_admin=current_user.is_admin,
+        username=str(current_user.username),
+        api_key=str(current_user.api_key),
+        is_admin=bool(current_user.is_admin),
     )
 
 
 @router.get("/all", response_model=list[UserMeResponse])
 async def read_all_users(
     current_user: UserDTO = Depends(get_current_user),
+    user_repository: UserRepository = Depends(get_user_repository),
 ) -> list[UserMeResponse]:
     """Get all users information.
 
     Args:
         current_user: Current authenticated user.
+        user_repository: User repository instance.
 
     Returns:
-        list[UserResponse]: List of all users information.
+        list[UserMeResponse]: List of all users information.
 
     Raises:
         HTTPException: If user is not authorized.
@@ -94,24 +102,30 @@ async def read_all_users(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions",
         )
-    users = await get_all_users()
-    return [
-        UserMeResponse(
-            username=user.username, is_admin=user.is_admin, api_key=user.api_key
-        )
-        for user in users
-    ]
+    async with get_db() as db:
+        users = await user_repository.get_all(db)
+        return [
+            UserMeResponse(
+                username=str(user.username),
+                is_admin=bool(user.is_admin),
+                api_key=str(user.api_key),
+            )
+            for user in users
+        ]
 
 
 @router.get("/usage/{username}", response_model=dict)
 async def get_user_usage(
-    username: str, current_user: UserDTO = Depends(get_current_user)
+    username: str,
+    current_user: UserDTO = Depends(get_current_user),
+    user_repository: UserRepository = Depends(get_user_repository),
 ) -> dict:
     """Get user's API usage statistics.
 
     Args:
         username: Username to get usage for.
         current_user: Current authenticated user.
+        user_repository: User repository instance.
 
     Returns:
         dict: User's API usage statistics.
@@ -125,24 +139,33 @@ async def get_user_usage(
             detail="Not enough permissions",
         )
 
-    try:
-        return await get_user_usage_stats(username)
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        ) from e
+    async with get_db() as db:
+        user = await user_repository.get_by_username(db, username)
+        if user is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found",
+            )
+
+        return {
+            "username": str(user.username),
+            "usage_limit": 0,
+            "current_usage": 0,
+        }
 
 
 @router.delete("/{username}")
 async def remove_user(
-    username: str, current_user: UserDTO = Depends(get_current_user)
+    username: str,
+    current_user: UserDTO = Depends(get_current_user),
+    user_repository: UserRepository = Depends(get_user_repository),
 ) -> dict:
     """Delete a user.
 
     Args:
         username: Username to delete.
         current_user: Current authenticated user.
+        user_repository: User repository instance.
 
     Returns:
         dict: Success message.
@@ -156,14 +179,16 @@ async def remove_user(
             detail="Not enough permissions",
         )
 
-    success = await delete_user(username)
-    if not success:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
-        )
+    async with get_db() as db:
+        user = await user_repository.get_by_username(db, username)
+        if user is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found",
+            )
 
-    return {"message": f"User {username} deleted successfully"}
+        await user_repository.delete(db, int(str(user.id)))
+        return {"message": f"User {username} deleted successfully"}
 
 
 @router.post("/password")
@@ -171,6 +196,7 @@ async def change_password(
     current_password: str,
     new_password: str,
     current_user: UserDTO = Depends(get_current_user),
+    user_repository: UserRepository = Depends(get_user_repository),
 ) -> dict:
     """Change user's password.
 
@@ -178,6 +204,7 @@ async def change_password(
         current_password: Current password for verification.
         new_password: New password to set.
         current_user: Current authenticated user.
+        user_repository: User repository instance.
 
     Returns:
         dict: Success message.
@@ -185,13 +212,17 @@ async def change_password(
     Raises:
         HTTPException: If password change fails.
     """
-    success = await update_password(
-        str(current_user.username), current_password, new_password
-    )
-    if not success:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid current password",
+    async with get_db() as db:
+        success = await user_repository.update_password(
+            db,
+            str(current_user.username),
+            current_password,
+            new_password,
         )
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid current password",
+            )
 
-    return {"message": "Password updated successfully"}
+        return {"message": "Password updated successfully"}

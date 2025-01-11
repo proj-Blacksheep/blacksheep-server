@@ -9,11 +9,11 @@ from typing import Any, Dict, Optional, cast
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import settings
-from src.db.database import get_session
-from src.models.users import UserORM
+from src.core.di import get_db, get_user_repository
+from src.repositories.users import UserRepository
 from src.schemas.v1.login import TokenData
 from src.schemas.v1.users import UserDTO
 
@@ -22,27 +22,34 @@ oauth2_scheme = OAuth2PasswordBearer(
 )
 
 
-async def authenticate_user(username: str, password: str) -> Optional[UserDTO]:
+async def authenticate_user(
+    username: str,
+    password: str,
+    db: AsyncSession,
+    user_repository: UserRepository,
+) -> Optional[UserDTO]:
     """Authenticate a user with username and password.
 
     Args:
         username: The username to authenticate.
         password: The password to verify.
+        db: Database session.
+        user_repository: User repository instance.
 
     Returns:
         Optional[UserDTO]: Authenticated user DTO or None if authentication fails.
     """
-    async with get_session() as session:
-        query = select(UserORM).where(UserORM.username == username)
-        result = await session.execute(query)
-        user = result.scalar_one_or_none()
+    # 입력값 정리
+    username = username.strip()  # 앞뒤 공백 제거
+    username = "".join(c for c in username if c.isprintable())  # 출력 가능한 문자만 유지
 
-        if user is None:
-            return None
-
-        if (user.password == password).is_(True):
-            return UserDTO.model_validate(user)
+    user = await user_repository.get_by_username(db, username)
+    if user is None:
         return None
+
+    if str(user.password) == password:  # TODO: 비밀번호 해싱 검증 필요
+        return UserDTO.model_validate(user)
+    return None
 
 
 def create_access_token(
@@ -68,11 +75,15 @@ def create_access_token(
     return str(encoded_jwt)
 
 
-async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserDTO:
+async def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    user_repository: UserRepository = Depends(get_user_repository),
+) -> UserDTO:
     """Get current user from JWT token.
 
     Args:
         token: JWT token from request.
+        user_repository: User repository instance.
 
     Returns:
         UserDTO: Current authenticated user.
@@ -96,11 +107,9 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserDTO:
     except jwt.InvalidTokenError:
         raise credentials_exception
 
-    async with get_session() as session:
-        result = await session.execute(
-            select(UserORM).where(UserORM.username == token_data.username)
-        )
-        user = result.scalar_one_or_none()
+    async with get_db() as db:
+        user = await user_repository.get_by_username(db, token_data.username)
         if user is None:
             raise credentials_exception
+
         return UserDTO.model_validate(user)

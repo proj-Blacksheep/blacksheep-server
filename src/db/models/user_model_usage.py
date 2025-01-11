@@ -5,8 +5,7 @@ This module defines the database model for tracking user usage of AI models.
 
 from sqlalchemy import Column, ForeignKey, Integer, String
 
-from src.db.database import Base
-from src.models.base import TimeStampMixin
+from src.db.models.base import Base, TimeStampMixin
 
 
 class UserModelUsage(Base, TimeStampMixin):

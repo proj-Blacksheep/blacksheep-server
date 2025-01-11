@@ -6,8 +6,7 @@ as well as SQLAlchemy models for database tables.
 
 from sqlalchemy import Column, Integer, String
 
-from src.db.database import Base
-from src.models.base import TimeStampMixin
+from src.db.models.base import Base, TimeStampMixin
 
 
 class Models(Base, TimeStampMixin):

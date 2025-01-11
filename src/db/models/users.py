@@ -2,8 +2,7 @@
 
 from sqlalchemy import Boolean, Column, Integer, String
 
-from src.db.database import Base
-from src.models.base import TimeStampMixin
+from src.db.models.base import Base, TimeStampMixin
 
 
 class UserORM(Base, TimeStampMixin):

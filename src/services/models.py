@@ -8,8 +8,8 @@ from typing import List, Optional
 
 from sqlalchemy import delete, select
 
-from src.db.database import get_session
-from src.models.models import Models
+from src.core.database import get_session
+from src.db.models.models import Models
 
 
 async def create_model_db(

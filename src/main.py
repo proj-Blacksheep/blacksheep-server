@@ -9,8 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.v1 import llm_api, login, models, users
 from src.core.config import settings
-from src.db.database import init_db
-from src.services.users import create_user_db
+from src.core.database import init_db
+from src.services.users import UserService
 
 app = FastAPI(
     title="BlackSheep API",
@@ -30,8 +30,8 @@ app.add_middleware(
 # Include routers
 app.include_router(login.router)
 app.include_router(users.router)
-app.include_router(models.router)
-app.include_router(llm_api.router)
+# app.include_router(models.router)
+# app.include_router(llm_api.router)
 
 
 @app.on_event("startup")
@@ -43,13 +43,18 @@ async def startup_event() -> None:
     and creates a default admin user if it doesn't exist.
     """
     await init_db()
+    user_service = UserService()
 
-    # Create default admin user
-    await create_user_db(
-        username=settings.DEFAULT_ADMIN_USERNAME,
-        password=settings.DEFAULT_ADMIN_PASSWORD,
-        role="admin",
-    )
+    try:
+        # Create default admin user
+        await user_service.create_user(
+            username=settings.DEFAULT_ADMIN_USERNAME,
+            password=settings.DEFAULT_ADMIN_PASSWORD,
+            is_admin=True,
+        )
+    except ValueError as e:
+        if "already exists" not in str(e):
+            raise  # 다른 종류의 에러는 다시 발생시킴
 
 
 @app.get("/")

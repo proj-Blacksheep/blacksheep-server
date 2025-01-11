@@ -4,8 +4,9 @@ from typing import Dict, List, Optional
 
 from sqlalchemy import select
 
-from src.db.database import get_session
-from src.models.users import UserORM
+from src.core.database import get_session
+from src.core.di import get_user_repository
+from src.db.models.users import UserORM
 from src.repositories.users import UserRepository
 from src.services.user_model_usage import get_usage_by_user_name
 
@@ -13,9 +14,13 @@ from src.services.user_model_usage import get_usage_by_user_name
 class UserService:
     """Service for user-related operations."""
 
-    def __init__(self):
-        """Initialize the user service."""
-        self._repository = UserRepository()
+    def __init__(self, repository: UserRepository = get_user_repository()):
+        """Initialize the user service.
+
+        Args:
+            repository: The user repository instance.
+        """
+        self._repository = repository
 
     async def create_user(
         self, username: str, password: str, is_admin: bool = False
@@ -31,12 +36,27 @@ class UserService:
             The created user.
 
         Raises:
-            ValueError: If user creation fails.
+            ValueError: If user creation fails or user already exists.
         """
         async with get_session() as session:
-            return await self._repository.create_user(
-                session, username=username, password=password, is_admin=is_admin
-            )
+            try:
+                # 사용자 중복 체크
+                existing_user = await self._repository.get_by_username(
+                    session, username
+                )
+                if existing_user is not None:
+                    raise ValueError(f"User {username} already exists")
+
+                # 새 사용자 생성
+                user = await self._repository.create_user(
+                    session, username=username, password=password, is_admin=is_admin
+                )
+                await session.commit()
+                await session.refresh(user)  # 생성된 사용자 정보를 새로고침
+                return user
+            except Exception as e:
+                await session.rollback()  # 에러 발생 시 롤백
+                raise
 
     async def get_all_users(self) -> List[UserORM]:
         """Get all users.
