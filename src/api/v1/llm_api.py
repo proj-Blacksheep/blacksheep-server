@@ -5,11 +5,9 @@ This module provides endpoints for making API calls to external services.
 
 from typing import Dict, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 
-from src.core.authentication import get_current_user
-from src.models.users import Users
 from src.services.azure_openai import call_azure_openai
 
 
@@ -33,14 +31,11 @@ router = APIRouter(prefix="/api", tags=["api"])
 
 
 @router.post("/call", response_model=Dict[str, str])
-async def call_api(
-    request: APICallRequest, current_user: Users = Depends(get_current_user)
-) -> Dict[str, str]:
+async def call_api(request: APICallRequest) -> Dict[str, str]:
     """Make an API call to the specified model.
 
     Args:
         request: The API call request parameters.
-        current_user: The authenticated user making the request.
 
     Returns:
         Dict[str, str]: The model's response.
@@ -60,4 +55,4 @@ async def call_api(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e),
-        )
+        ) from e

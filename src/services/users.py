@@ -1,136 +1,149 @@
-"""User management service module."""
+"""User service module for business logic operations."""
 
-import uuid
-from typing import List, Optional, cast
+from typing import Dict, List, Optional
 
-from sqlalchemy import delete, select
+from sqlalchemy import select
 
-from src.db.database import get_session
-from src.models.users import Users
-
-
-async def create_user_db(username: str, password: str, role: str = "basic") -> Users:
-    """Create a new user in the database.
-
-    Args:
-        username: The username for the new user.
-        password: The password for the user account.
-        role: The role of the user (basic or admin). Defaults to basic.
-
-    Returns:
-        Users: The created or existing user object.
-
-    Raises:
-        ValueError: If user creation fails.
-    """
-    async with get_session() as session:
-        # Check if username already exists
-        result = await session.execute(select(Users).where(Users.username == username))
-        user = result.scalar_one_or_none()
-        if user:
-            return cast(Users, user)
-
-        api_key = str(uuid.uuid4().hex)
-        new_user = Users(
-            username=username,
-            password=password,
-            api_key=api_key,
-            role=role,
-        )
-
-        session.add(new_user)
-        await session.commit()
-        await session.refresh(new_user)
-
-        return new_user
+from src.core.database import get_session
+from src.core.di import get_user_repository
+from src.db.models.users import UserORM
+from src.repositories.users import UserRepository
+from src.services.user_model_usage import get_usage_by_user_name
 
 
-async def get_all_users() -> List[Users]:
-    """Get all users from the database.
+class UserService:
+    """Service for user-related operations."""
 
-    Returns:
-        List[Users]: List of all users in the database.
-    """
-    async with get_session() as session:
-        result = await session.execute(select(Users))
-        users = result.scalars().all()
-        return list(users)
+    def __init__(self, repository: UserRepository = get_user_repository()):
+        """Initialize the user service.
 
+        Args:
+            repository: The user repository instance.
+        """
+        self._repository = repository
 
-async def get_user_by_api_key(api_key: str) -> Optional[Users]:
-    """Get a user by their API key.
+    async def create_user(
+        self, username: str, password: str, is_admin: bool = False
+    ) -> UserORM:
+        """Create a new user.
 
-    Args:
-        api_key: The API key to search for.
+        Args:
+            username: The username for the new user.
+            password: The password for the user account.
+            is_admin: Whether the user is an admin. Defaults to False.
 
-    Returns:
-        Optional[Users]: The user object if found, None otherwise.
-    """
-    async with get_session() as session:
-        result = await session.execute(select(Users).where(Users.api_key == api_key))
-        user = result.scalar_one_or_none()
-        return cast(Optional[Users], user)
+        Returns:
+            The created user.
 
+        Raises:
+            ValueError: If user creation fails or user already exists.
+        """
+        async with get_session() as session:
+            try:
+                # 사용자 중복 체크
+                existing_user = await self._repository.get_by_username(
+                    session, username
+                )
+                if existing_user is not None:
+                    raise ValueError(f"User {username} already exists")
 
-async def delete_user(username: str) -> bool:
-    """Delete a user from the database.
+                # 새 사용자 생성
+                user = await self._repository.create_user(
+                    session, username=username, password=password, is_admin=is_admin
+                )
+                await session.commit()
+                await session.refresh(user)  # 생성된 사용자 정보를 새로고침
+                return user
+            except Exception:
+                await session.rollback()
+                raise
 
-    Args:
-        username: The username of the user to delete.
+    async def get_all_users(self) -> List[UserORM]:
+        """Get all users.
 
-    Returns:
-        bool: True if user was deleted, False if user was not found.
-    """
-    async with get_session() as session:
-        result = await session.execute(delete(Users).where(Users.username == username))
-        if result.rowcount > 0:
-            await session.commit()
-            return True
-        return False
+        Returns:
+            List of all users.
+        """
+        async with get_session() as session:
+            return await self._repository.get_all(session)
 
+    async def get_user_by_api_key(self, api_key: str) -> Optional[UserORM]:
+        """Get a user by their API key.
 
-async def set_usage_limit(username: str, limit: int) -> bool:
-    """Set usage limit for a user.
+        Args:
+            api_key: The API key to search for.
 
-    Args:
-        username: The username of the user.
-        limit: The new usage limit to set.
+        Returns:
+            The user if found, None otherwise.
+        """
+        async with get_session() as session:
+            return await self._repository.get_by_api_key(session, api_key)
 
-    Returns:
-        bool: True if limit was set successfully, False if user was not found.
-    """
-    async with get_session() as session:
-        result = await session.execute(select(Users).where(Users.username == username))
-        user = result.scalar_one_or_none()
+    async def delete_user(self, username: str) -> bool:
+        """Delete a user.
 
-        if not user:
-            return False
+        Args:
+            username: The username of the user to delete.
 
-        user.usage_limit = limit
-        await session.commit()
-        return True
+        Returns:
+            True if the user was deleted, False if they weren't found.
+        """
+        async with get_session() as session:
+            user = await self._repository.get_by_username(session, username)
+            if user is None:
+                return False
 
+            result = await session.execute(select(user.id))
+            user_id = result.scalar_one()
+            return await self._repository.delete(session, user_id)
 
-async def update_password(
-    username: str, current_password: str, new_password: str
-) -> bool:
-    """Update user's password.
+    async def set_usage_limit(self, username: str, limit: int) -> bool:
+        """Set the usage limit for a user.
 
-    Args:
-        username: The username of the user.
-        current_password: The current password for verification.
-        new_password: The new password to set.
+        Args:
+            username: The username of the user.
+            limit: The new usage limit.
 
-    Returns:
-        bool: True if password was updated successfully, False if verification fails.
-    """
-    async with get_session() as session:
-        result = await session.execute(select(Users).where(Users.username == username))
-        user = result.scalar_one_or_none()
+        Returns:
+            True if the limit was set, False if the user wasn't found.
+        """
+        async with get_session() as session:
+            return await self._repository.set_usage_limit(session, username, limit)
 
-        if not user or user.password != current_password:  # TODO: 실제 구현시 비밀번호 해싱 필요
-            return False
+    async def update_password(
+        self, username: str, current_password: str, new_password: str
+    ) -> bool:
+        """Update a user's password.
 
-        user.password = new_password
-        await session.commit()
-        return True
+        Args:
+            username: The username of the user.
+            current_password: The current password for verification.
+            new_password: The new password to set.
+
+        Returns:
+            True if the password was updated, False if verification fails.
+        """
+        async with get_session() as session:
+            return await self._repository.update_password(
+                session, username, current_password, new_password
+            )
+
+    async def get_user_usage_stats(self, username: str) -> Dict:
+        """Get usage statistics for a user.
+
+        Args:
+            username: The username to get statistics for.
+
+        Returns:
+            Dictionary containing usage statistics.
+
+        Raises:
+            ValueError: If the user is not found.
+        """
+        async with get_session() as session:
+            user = await self._repository.get_by_username(session, username)
+            if user is None:
+                raise ValueError(f"User {username} not found")
+
+        usage = await get_usage_by_user_name(username)
+        return {"username": username, "usage": usage}

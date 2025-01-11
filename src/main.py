@@ -7,10 +7,10 @@ includes routers, and provides health check endpoints.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.api import call_api, login, models, users
+from src.api.v1 import llm_api, login, models, users
 from src.core.config import settings
-from src.db.database import init_db
-from src.services.users import create_user_db
+from src.core.database import init_db
+from src.services.users import UserService
 
 app = FastAPI(
     title="BlackSheep API",
@@ -31,7 +31,7 @@ app.add_middleware(
 app.include_router(login.router)
 app.include_router(users.router)
 app.include_router(models.router)
-app.include_router(call_api.router)
+app.include_router(llm_api.router)
 
 
 @app.on_event("startup")
@@ -43,13 +43,18 @@ async def startup_event() -> None:
     and creates a default admin user if it doesn't exist.
     """
     await init_db()
+    user_service = UserService()
 
-    # Create default admin user
-    await create_user_db(
-        username=settings.DEFAULT_ADMIN_USERNAME,
-        password=settings.DEFAULT_ADMIN_PASSWORD,
-        role="admin",
-    )
+    try:
+        # Create default admin user
+        await user_service.create_user(
+            username=settings.DEFAULT_ADMIN_USERNAME,
+            password=settings.DEFAULT_ADMIN_PASSWORD,
+            is_admin=True,
+        )
+    except ValueError as e:
+        if "already exists" not in str(e):
+            raise  # 다른 종류의 에러는 다시 발생시킴
 
 
 @app.get("/")
@@ -63,14 +68,10 @@ async def root() -> dict:
 
 
 @app.get("/health")
-async def health_check() -> dict:
-    """Health check endpoint.
+async def health_check() -> dict[str, str]:
+    """Health check endpoint to verify API server status.
 
     Returns:
-        dict: Detailed health check response.
+        dict[str, str]: A dictionary containing the health status.
     """
-    return {
-        "status": "healthy",
-        "version": settings.VERSION,
-        "environment": settings.ENVIRONMENT,
-    }
+    return {"status": "healthy"}

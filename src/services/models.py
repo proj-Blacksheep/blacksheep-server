@@ -8,11 +8,13 @@ from typing import List, Optional
 
 from sqlalchemy import delete, select
 
-from src.db.database import get_session
-from src.models.models import Models
+from src.core.database import get_session
+from src.db.models.models import Models
 
 
-async def create_model_db(model_name: str, model_type: str) -> Optional[Models]:
+async def create_model_db(
+    model_name: str, model_type: str, model_endpoint: str, model_api_key: str
+) -> Optional[Models]:
     """Create a new model in the database.
 
     Args:
@@ -34,6 +36,8 @@ async def create_model_db(model_name: str, model_type: str) -> Optional[Models]:
         new_model = Models(
             model_name=model_name,
             model_type=model_type,
+            model_endpoint=model_endpoint,
+            model_api_key=model_api_key,
         )
         session.add(new_model)
         await session.commit()

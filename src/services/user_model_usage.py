@@ -5,51 +5,64 @@ This module provides functions for managing user model usage records.
 
 from typing import Dict
 
-from sqlalchemy import select
+from fastapi import Depends
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.db.database import get_session
-from src.models.user_model_usage import UserModelUsage
-from src.models.users import Users
+from src.core.di import get_db, get_user_model_usage_repository, get_user_repository
+from src.repositories.user_model_usage import UserModelUsageRepository
+from src.repositories.users import UserRepository
 
 
-async def get_usage_by_user_name(username: str) -> Dict[str, int]:
+async def get_usage_by_user_name(
+    username: str,
+    db: AsyncSession = Depends(get_db),
+    user_repository: UserRepository = Depends(get_user_repository),
+    usage_repository: UserModelUsageRepository = Depends(
+        get_user_model_usage_repository
+    ),
+) -> Dict[str, int]:
     """Get model usage statistics for a user.
 
     Args:
         username: The username to get usage for.
+        db: Database session.
+        user_repository: User repository instance.
+        usage_repository: User model usage repository instance.
 
     Returns:
         Dict[str, int]: Dictionary containing usage statistics.
     """
-    async with get_session() as session:
-        # Get user ID
-        result = await session.execute(select(Users).where(Users.username == username))
-        user = result.scalar_one_or_none()
-        if not user:
-            return {}
+    user = await user_repository.get_by_username(db, username)
+    if user is None:
+        return {}
 
-        # Get usage records
-        result = await session.execute(
-            select(UserModelUsage).where(UserModelUsage.user_id == user.id)
-        )
-        usage_records = result.scalars().all()
+    usage_records = await usage_repository.get_by_user_id(db, int(user.id))
 
-        # Aggregate usage
-        usage_stats = {
-            "total_usage": sum(record.usage_count for record in usage_records),
-            "by_type": {},
-        }
+    # Aggregate usage
+    usage_stats = {
+        "total_usage": sum(int(record.usage_count) for record in usage_records),
+        "by_type": {},
+    }
 
-        for record in usage_records:
-            if record.usage_type not in usage_stats["by_type"]:
-                usage_stats["by_type"][record.usage_type] = 0
-            usage_stats["by_type"][record.usage_type] += record.usage_count
+    for record in usage_records:
+        usage_type = str(record.usage_type)
+        if usage_type not in usage_stats["by_type"]:
+            usage_stats["by_type"][usage_type] = 0
+        usage_stats["by_type"][usage_type] += int(record.usage_count)
 
-        return usage_stats
+    return usage_stats
 
 
 async def record_model_usage(
-    username: str, model_id: int, usage_type: str, count: int = 1
+    username: str,
+    model_id: int,
+    usage_type: str,
+    count: int = 1,
+    db: AsyncSession = Depends(get_db),
+    user_repository: UserRepository = Depends(get_user_repository),
+    usage_repository: UserModelUsageRepository = Depends(
+        get_user_model_usage_repository
+    ),
 ) -> bool:
     """Record model usage for a user.
 
@@ -58,37 +71,22 @@ async def record_model_usage(
         model_id: The ID of the model used.
         usage_type: The type of usage.
         count: The number of times the model was used.
+        db: Database session.
+        user_repository: User repository instance.
+        usage_repository: User model usage repository instance.
 
     Returns:
         bool: True if usage was recorded successfully, False otherwise.
     """
-    async with get_session() as session:
-        # Get user ID
-        result = await session.execute(select(Users).where(Users.username == username))
-        user = result.scalar_one_or_none()
-        if not user:
-            return False
+    user = await user_repository.get_by_username(db, username)
+    if user is None:
+        return False
 
-        # Create or update usage record
-        result = await session.execute(
-            select(UserModelUsage).where(
-                UserModelUsage.user_id == user.id,
-                UserModelUsage.model_id == model_id,
-                UserModelUsage.usage_type == usage_type,
-            )
-        )
-        usage_record = result.scalar_one_or_none()
-
-        if usage_record:
-            usage_record.usage_count += count
-        else:
-            usage_record = UserModelUsage(
-                user_id=user.id,
-                model_id=model_id,
-                usage_type=usage_type,
-                usage_count=count,
-            )
-            session.add(usage_record)
-
-        await session.commit()
-        return True
+    await usage_repository.create_or_update(
+        db,
+        user_id=int(user.id),
+        model_id=model_id,
+        usage_type=usage_type,
+        count=count,
+    )
+    return True

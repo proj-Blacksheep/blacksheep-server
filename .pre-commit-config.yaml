@@ -42,15 +42,14 @@ repos:
           - types-python-jose
           - types-requests
           - sqlalchemy>=2.0.0
+          - pydantic>=2.0.0
         args: [
           "--ignore-missing-imports",
-          "--disable-error-code=valid-type",
           "--disable-error-code=misc",
           "--disallow-untyped-defs",
           "--check-untyped-defs",
           "--warn-redundant-casts",
           "--warn-unused-ignores",
-          "--warn-return-any",
-          "--strict-optional",
-          "--strict-equality"
+          "--no-implicit-optional",
+          "--strict-optional"
         ]
