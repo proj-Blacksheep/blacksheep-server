@@ -54,8 +54,8 @@ class UserService:
                 await session.commit()
                 await session.refresh(user)  # 생성된 사용자 정보를 새로고침
                 return user
-            except Exception as e:
-                await session.rollback()  # 에러 발생 시 롤백
+            except Exception:
+                await session.rollback()
                 raise
 
     async def get_all_users(self) -> List[UserORM]:

@@ -36,6 +36,8 @@ async def create_model_db(
         new_model = Models(
             model_name=model_name,
             model_type=model_type,
+            model_endpoint=model_endpoint,
+            model_api_key=model_api_key,
         )
         session.add(new_model)
         await session.commit()

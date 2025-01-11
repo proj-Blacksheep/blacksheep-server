@@ -41,7 +41,7 @@ async def authenticate_user(
     """
     # 입력값 정리
     username = username.strip()  # 앞뒤 공백 제거
-    username = "".join(c for c in username if c.isprintable())  # 출력 가능한 문자만 유지
+    username = "".join(c for c in username if c.isprintable())
 
     user = await user_repository.get_by_username(db, username)
     if user is None:

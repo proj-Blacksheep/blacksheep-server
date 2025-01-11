@@ -7,7 +7,6 @@ user creation, deletion, and updates.
 from typing import Dict
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.authentication import get_current_user
 from src.core.di import get_db, get_user_repository

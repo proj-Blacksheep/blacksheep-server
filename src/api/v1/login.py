@@ -31,7 +31,6 @@ async def login(
     Raises:
         HTTPException: If authentication fails.
     """
-
     async with get_db() as db:
         user = await authenticate_user(
             form_data.username, form_data.password, db, user_repository

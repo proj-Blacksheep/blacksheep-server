@@ -30,8 +30,8 @@ app.add_middleware(
 # Include routers
 app.include_router(login.router)
 app.include_router(users.router)
-# app.include_router(models.router)
-# app.include_router(llm_api.router)
+app.include_router(models.router)
+app.include_router(llm_api.router)
 
 
 @app.on_event("startup")

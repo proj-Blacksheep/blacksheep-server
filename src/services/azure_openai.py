@@ -5,6 +5,8 @@ This module provides functions for interacting with Azure OpenAI services.
 
 from typing import Optional, cast
 
+import openai
+
 
 async def call_azure_openai(
     model_name: str,
