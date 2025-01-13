@@ -23,7 +23,7 @@ class ModelType(str, Enum):
     GCP_GEMINI = "GCP_GEMINI"
 
 
-class Models(Base, TimeStampMixin):
+class Models(Base, TimeStampMixin):  # type: ignore
     """Model for storing AI model information.
 
     Attributes:

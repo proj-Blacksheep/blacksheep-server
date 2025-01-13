@@ -19,7 +19,7 @@ class ModelUsageType(str, Enum):
     CACHED = "CACHED"
 
 
-class UserModelUsage(Base, TimeStampMixin):
+class UserModelUsage(Base, TimeStampMixin):  # type: ignore
     """Model for tracking user usage of AI models.
 
     Attributes:
