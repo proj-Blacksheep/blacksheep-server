@@ -26,7 +26,7 @@ class Logger:
         >>> logger.error("An error occurred", exc_info=True)
     """
 
-    _instance: Final[logging.Logger] = logging.getLogger("rich")
+    _INSTANCE: Final[logging.Logger] = logging.getLogger("rich")
 
     def __init__(self) -> None:
         """Initialize the logger configuration.
@@ -47,13 +47,13 @@ class Logger:
             logging.Logger: The configured logger instance.
         """
         logging.basicConfig(
-            level=settings.log_level,
+            level=settings.LOG_LEVEL,
             format="%(message)s",
             datefmt="[%X]",
             handlers=[RichHandler(rich_tracebacks=True, console=Console(width=127))],
             force=True,
         )
-        return cls._instance
+        return cls._INSTANCE
 
 
 # Convenience function for getting the logger

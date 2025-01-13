@@ -24,7 +24,7 @@ class Settings(BaseSettings):
         DB_ECHO: Whether to echo SQL statements.
     """
 
-    log_level: str = "INFO"
+    LOG_LEVEL: str = "INFO"
 
     VERSION: str = "1.0.0"
     ENVIRONMENT: str = "development"
