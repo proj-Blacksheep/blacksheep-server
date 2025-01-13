@@ -16,6 +16,7 @@ pydantic = "^2.5.3"
 pydantic-settings = "^2.1.0"
 pyjwt = {extras = ["crypto"], version = "^2.10.1"}
 openai = "^1.59.6"
+rich = "^13.9.4"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.3.0"

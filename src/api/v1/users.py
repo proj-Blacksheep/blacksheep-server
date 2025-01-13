@@ -113,46 +113,6 @@ async def read_all_users(
         ]
 
 
-@router.get("/usage/{username}", response_model=dict)
-async def get_user_usage(
-    username: str,
-    current_user: UserDTO = Depends(get_current_user),
-    user_repository: UserRepository = Depends(get_user_repository),
-) -> dict:
-    """Get user's API usage statistics.
-
-    Args:
-        username: Username to get usage for.
-        current_user: Current authenticated user.
-        user_repository: User repository instance.
-
-    Returns:
-        dict: User's API usage statistics.
-
-    Raises:
-        HTTPException: If user is not authorized or not found.
-    """
-    if not current_user.is_admin and current_user.username != username:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions",
-        )
-
-    async with get_db() as db:
-        user = await user_repository.get_by_username(db, username)
-        if user is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found",
-            )
-
-        return {
-            "username": str(user.username),
-            "usage_limit": 0,
-            "current_usage": 0,
-        }
-
-
 @router.delete("/{username}")
 async def remove_user(
     username: str,

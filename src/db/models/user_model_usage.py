@@ -3,9 +3,20 @@
 This module defines the database model for tracking user usage of AI models.
 """
 
-from sqlalchemy import Column, ForeignKey, Integer, String
+from enum import Enum
+
+from sqlalchemy import Column, ForeignKey, Integer
+from sqlalchemy.types import Enum as SQLAlchemyEnum
 
 from src.db.models.base import Base, TimeStampMixin
+
+
+class ModelUsageType(str, Enum):
+    """Enum for the type of model usage."""
+
+    COMPLETION = "COMPLETION"
+    PROMPT = "PROMPT"
+    CACHED = "CACHED"
 
 
 class UserModelUsage(Base, TimeStampMixin):
@@ -24,5 +35,5 @@ class UserModelUsage(Base, TimeStampMixin):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     model_id = Column(Integer, ForeignKey("models.id"), nullable=False)
-    usage_type = Column(String(50), nullable=False)
+    usage_type = Column(SQLAlchemyEnum(ModelUsageType), nullable=False)
     usage_count = Column(Integer, default=0, nullable=False)
