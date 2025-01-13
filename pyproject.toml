@@ -16,6 +16,7 @@ pydantic = "^2.5.3"
 pydantic-settings = "^2.1.0"
 pyjwt = {extras = ["crypto"], version = "^2.10.1"}
 openai = "^1.59.6"
+rich = "^13.9.4"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.3.0"
@@ -45,12 +46,12 @@ line_length = 88
 
 [tool.mypy]
 python_version = "3.12"
-warn_return_any = false
+warn_return_any = true
 warn_unused_configs = true
-disallow_untyped_defs = false
+disallow_untyped_defs = true
 check_untyped_defs = true
-disallow_incomplete_defs = false
-disallow_untyped_decorators = false
+disallow_incomplete_defs = true
+disallow_untyped_decorators = true
 no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
@@ -60,11 +61,12 @@ ignore_missing_imports = true
 disable_error_code = [
     "attr-defined",
     "assignment",
-    "valid-type",
     "no-untyped-def",
     "return-value",
     "operator",
-    "index"
+    "index",
+    "type-var",
+    "no-any-return"
 ]
 
 [[tool.mypy.overrides]]

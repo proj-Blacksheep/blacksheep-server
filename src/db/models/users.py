@@ -5,7 +5,7 @@ from sqlalchemy import Boolean, Column, Integer, String
 from src.db.models.base import Base, TimeStampMixin
 
 
-class UserORM(Base, TimeStampMixin):
+class UserORM(Base, TimeStampMixin):  # type: ignore
     """SQLAlchemy model for storing user related details.
 
     Attributes:

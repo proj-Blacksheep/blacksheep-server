@@ -8,7 +8,7 @@ from sqlalchemy import Column, ForeignKey, Integer, String
 from src.db.models.base import Base, TimeStampMixin
 
 
-class UserModelAccess(Base, TimeStampMixin):
+class UserModelAccess(Base, TimeStampMixin):  # type: ignore
     """Model for tracking user access to AI models.
 
     Attributes:

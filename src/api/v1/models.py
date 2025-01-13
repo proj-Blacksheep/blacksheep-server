@@ -9,6 +9,7 @@ from typing import Any, Dict, List
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from src.core.authentication import get_current_user
+from src.core.utils import get_logger
 from src.schemas.v1.models import ModelCreateRequest
 from src.schemas.v1.users import UserDTO
 from src.services.models import create_model_db, delete_model, get_all_models
@@ -18,6 +19,8 @@ router = APIRouter(
     tags=["models"],
     responses={404: {"description": "Not found"}},
 )
+
+logger = get_logger()
 
 
 @router.post("/create", status_code=status.HTTP_200_OK)
@@ -46,6 +49,8 @@ async def create_model(
     model = await create_model_db(
         model_name=model.model_name,
         model_type=model.model_type,
+        model_deployment_name=model.model_deployment_name,
+        model_description=model.model_description,
         model_endpoint=model.model_endpoint,
         model_api_key=model.model_api_key,
     )
@@ -78,6 +83,9 @@ async def get_models(
         {
             "model_name": model.model_name,
             "model_type": model.model_type,
+            "model_deployment_name": model.model_deployment_name,
+            "model_description": model.model_description,
+            "model_endpoint": model.model_endpoint,
             "created_at": model.created_at,
         }
         for model in models

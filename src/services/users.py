@@ -8,6 +8,7 @@ from src.core.database import get_session
 from src.core.di import get_user_repository
 from src.db.models.users import UserORM
 from src.repositories.users import UserRepository
+from src.schemas.v1.users import UserDTO
 from src.services.user_model_usage import get_usage_by_user_name
 
 
@@ -67,17 +68,23 @@ class UserService:
         async with get_session() as session:
             return await self._repository.get_all(session)
 
-    async def get_user_by_api_key(self, api_key: str) -> Optional[UserORM]:
-        """Get a user by their API key.
+    async def get_user_by_api_key(self, api_key: str) -> Optional[UserDTO]:
+        """Get user information from the database by API key.
 
         Args:
-            api_key: The API key to search for.
+            api_key: The API key of the user.
 
         Returns:
-            The user if found, None otherwise.
+            Optional[UserDTO]: The user DTO object if found, None otherwise.
         """
         async with get_session() as session:
-            return await self._repository.get_by_api_key(session, api_key)
+            result = await session.execute(
+                select(UserORM).where(UserORM.api_key == api_key)
+            )
+            user = result.scalar_one_or_none()
+            if user:
+                return UserDTO.model_validate(user)
+            return None
 
     async def delete_user(self, username: str) -> bool:
         """Delete a user.

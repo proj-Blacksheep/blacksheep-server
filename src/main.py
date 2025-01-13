@@ -7,7 +7,7 @@ includes routers, and provides health check endpoints.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.api.v1 import llm_api, login, models, users
+from src.api.v1 import llm_api, login, models, user_model_usage, users
 from src.core.config import settings
 from src.core.database import init_db
 from src.services.users import UserService
@@ -32,6 +32,7 @@ app.include_router(login.router)
 app.include_router(users.router)
 app.include_router(models.router)
 app.include_router(llm_api.router)
+app.include_router(user_model_usage.router)
 
 
 @app.on_event("startup")

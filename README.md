@@ -71,33 +71,33 @@ poetry run python -m src.main
 
 ### User Management API (`/users`)
 
-#### Regular User Endpoints
 | Endpoint | Method | Description | Request Data | Response |
 |----------|---------|-------------|--------------|----------|
-| `/users/me` | GET | Get current user information | - | User info |
-| `/users/usage/{username}` | GET | Get user's API usage | - | Usage info |
-| `/users/password` | POST | Change password | `current_password`, `new_password` | Success message |
-
-#### Admin Endpoints
-| Endpoint | Method | Description | Request Data | Response |
-|----------|---------|-------------|--------------|----------|
+| `/users/me` | GET | Get current user information | - | User info with API key |
 | `/users/create` | POST | Create new user | `username`, `password`, `is_admin` | Success message |
-| `/users/all` | GET | Get all users information | - | User list |
-| `/users/{username}` | DELETE | Delete user | - | Success message |
+| `/users/all` | GET | Get all users information (Admin only) | - | List of all users |
+| `/users/{username}` | DELETE | Delete user (Admin only) | - | Success message |
+| `/users/password` | POST | Change user password | `current_password`, `new_password` | Success message |
 
 ### Model Management API (`/models`)
 
-| Endpoint | Method | Description | Permission | Request Data | Response |
-|----------|---------|-------------|------------|--------------|----------|
-| `/models/create` | POST | Create new model | Admin | `model_name`, `model_type`, `model_endpoint`, `model_api_key` | Success message |
-| `/models/all` | GET | List available models | All users | - | Model list |
-| `/models/{model_name}` | DELETE | Delete model | Admin | - | Success message |
+| Endpoint | Method | Description | Request Data | Response |
+|----------|---------|-------------|--------------|----------|
+| `/models/create` | POST | Create new model (Admin only) | `model_name`, `model_type`, `model_deployment_name`, `model_description`, `model_endpoint`, `model_api_key` | Success message |
+| `/models/all` | GET | List all available models | - | List of models |
+| `/models/{model_name}` | DELETE | Delete model (Admin only) | - | Success message |
 
-### Model Inference API (`/api`)
+### LLM API (`/api`)
 
 | Endpoint | Method | Description | Request Data | Response |
 |----------|---------|-------------|--------------|----------|
-| `/api/call` | POST | Call AI model | `model_name`, `prompt`, `max_tokens` (optional), `temperature` (optional) | Model response |
+| `/api/call` | POST | Call AI model | `user_api_key`, `model_name`, `prompt`, `max_tokens` (optional), `temperature` (optional) | Model response |
+
+### Usage Statistics API (`/usage`)
+
+| Endpoint | Method | Description | Request Data | Response |
+|----------|---------|-------------|--------------|----------|
+| `/usage/{username}` | GET | Get user's API usage statistics | `start_date` (optional), `end_date` (optional) | Usage statistics |
 
 ## Supported AI Models
 
